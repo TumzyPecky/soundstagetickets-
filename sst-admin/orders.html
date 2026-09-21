@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Orders | Sound Stage Tickets Admin</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  (async function () {
+    const ok = await requireAdminSession();
+    if (!ok) return;
+
+    renderAdminShell("/orders.html", `
+      <h1>Orders</h1>
+      <form id="filter-form" class="toolbar" style="margin-top:16px;">
+        <div class="search-input-wrap">
+          ${Icon("search", { size: 14 })}
+          <input type="text" id="q" placeholder="Search order #, name, or email" class="glass-input" style="width:260px;" />
+        </div>
+        <select id="status" class="glass-input" style="width:auto;">
+          <option value="">All statuses</option>
+          <option value="AWAITING_RECEIPT">Awaiting Receipt</option>
+          <option value="PENDING_REVIEW">Pending Review</option>
+          <option value="PAID">Paid</option>
+          <option value="DECLINED">Declined</option>
+          <option value="CANCELLED">Cancelled</option>
+          <option value="REFUNDED">Refunded</option>
+        </select>
+        <button class="btn btn-primary btn-sm" type="submit">Filter</button>
+      </form>
+      <div class="table-wrap glass" style="margin-top:16px;">
+        <table>
+          <thead><tr><th>Order</th><th>Customer</th><th>Ticket</th><th>Amount</th><th>Distributor</th><th>Status</th><th>Date</th><th></th></tr></thead>
+          <tbody id="orders-body"></tbody>
+        </table>
+      </div>
+    `);
+
+    async function load() {
+      const q = document.getElementById("q").value.trim();
+      const status = document.getElementById("status").value;
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      if (status) params.set("status", status);
+
+      try {
+        const data = await api(`/api/admin/orders?${params.toString()}`);
+        document.getElementById("orders-body").innerHTML = data.orders.length
+          ? data.orders
+              .map(
+                (o) => `
+          <tr${o.status === "PENDING_REVIEW" ? ' style="border-left:3px solid #d4af37;background:rgba(212,175,55,0.05);"' : ""}>
+            <td><a href="/order-detail.html?id=${o.id}" style="color:var(--ice);">${o.orderNumber}</a></td>
+            <td><div class="strong" style="color:white;">${o.customer.fullName}</div><div style="font-size:12px;color:rgba(232,238,252,0.4);">${o.customer.email}</div></td>
+            <td>${o.orderItems.map((i) => `${i.quantity}x ${i.ticketType.name}`).join(", ")}</td>
+            <td>${formatNaira(o.total)}</td>
+            <td>${o.distributor ? o.distributor.name : "—"}</td>
+            <td>${statusPill(o.status)}</td>
+            <td style="font-size:12px;color:rgba(232,238,252,0.4);">${new Date(o.createdAt).toLocaleDateString()}</td>
+            <td>${o.status === "PENDING_REVIEW" ? `<a href="/order-detail.html?id=${o.id}" class="btn btn-primary btn-sm">Review</a>` : ""}</td>
+          </tr>`
+              )
+              .join("")
+          : `<tr><td colspan="8" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">No orders found.</td></tr>`;
+      } catch (err) {
+        document.getElementById("orders-body").innerHTML = `<tr><td colspan="8" style="color:#f87171;padding:16px;">${err.message}</td></tr>`;
+      }
+    }
+
+    document.getElementById("filter-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      load();
+    });
+
+    load();
+  })();
+</script>
+</body>
+</html>

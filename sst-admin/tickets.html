@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Ticket Types | Sound Stage Tickets Admin</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  let eventId = null;
+
+  (async function () {
+    const ok = await requireAdminSession();
+    if (!ok) return;
+
+    renderAdminShell("/tickets.html", `
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h1>Ticket Types</h1>
+        <button class="btn btn-primary btn-sm" id="new-btn">${Icon("plus", { size: 14 })} New Ticket Type</button>
+      </div>
+      <div id="new-form-wrap" style="margin-top:16px;"></div>
+      <div class="table-wrap glass" style="margin-top:16px;">
+        <table>
+          <thead><tr><th>Name</th><th>Price (₦)</th><th>Total Qty</th><th>Sold</th><th>Remaining</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="tt-body"></tbody>
+        </table>
+      </div>
+    `);
+
+    document.getElementById("new-btn").addEventListener("click", showNewForm);
+
+    await load();
+  })();
+
+  async function load() {
+    try {
+      const data = await api("/api/admin/dashboard");
+      eventId = data.ticketTypes[0] ? data.ticketTypes[0].eventId : null;
+      renderRows(data.ticketTypes);
+    } catch (err) {
+      document.getElementById("tt-body").innerHTML = `<tr><td colspan="7" style="color:#f87171;padding:16px;">${err.message}</td></tr>`;
+    }
+  }
+
+  function renderRows(ticketTypes) {
+    document.getElementById("tt-body").innerHTML = ticketTypes.length
+      ? ticketTypes.map(rowHtml).join("")
+      : `<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">No ticket types yet.</td></tr>`;
+
+    ticketTypes.forEach((t) => wireRow(t));
+  }
+
+  function rowHtml(t) {
+    return `
+      <tr data-id="${t.id}">
+        <td class="strong">${t.name}</td>
+        <td><input class="glass-input price-input" style="width:110px;padding:4px 8px;" type="number" min="0" value="${t.price / 100}" /></td>
+        <td><input class="glass-input qty-input" style="width:80px;padding:4px 8px;" type="number" min="${t.soldQuantity}" value="${t.quantity}" /></td>
+        <td>${t.soldQuantity}</td>
+        <td class="remaining-cell">${Math.max(t.quantity - t.soldQuantity, 0)}</td>
+        <td>
+          <select class="glass-input status-input" style="padding:4px 8px;">
+            <option value="AVAILABLE" ${t.status === "AVAILABLE" ? "selected" : ""}>AVAILABLE</option>
+            <option value="SOLD_OUT" ${t.status === "SOLD_OUT" ? "selected" : ""}>SOLD_OUT</option>
+            <option value="DISABLED" ${t.status === "DISABLED" ? "selected" : ""}>DISABLED</option>
+          </select>
+        </td>
+        <td>
+          <button class="btn btn-primary btn-sm save-btn">Save</button>
+          <span class="save-error" style="color:#f87171;font-size:11px;display:block;margin-top:4px;"></span>
+        </td>
+      </tr>`;
+  }
+
+  function wireRow(t) {
+    const tr = document.querySelector(`tr[data-id="${t.id}"]`);
+    if (!tr) return;
+    const priceInput = tr.querySelector(".price-input");
+    const qtyInput = tr.querySelector(".qty-input");
+    const statusInput = tr.querySelector(".status-input");
+    const saveBtn = tr.querySelector(".save-btn");
+    const errorEl = tr.querySelector(".save-error");
+    const remainingCell = tr.querySelector(".remaining-cell");
+
+    qtyInput.addEventListener("input", () => {
+      remainingCell.textContent = Math.max(Number(qtyInput.value) - t.soldQuantity, 0);
+    });
+
+    saveBtn.addEventListener("click", async () => {
+      errorEl.textContent = "";
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving…";
+      try {
+        await api(`/api/admin/ticket-types/${t.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            priceNaira: Number(priceInput.value),
+            quantity: Number(qtyInput.value),
+            status: statusInput.value,
+          }),
+        });
+        await load();
+      } catch (err) {
+        errorEl.textContent = err.message;
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save";
+      }
+    });
+  }
+
+  function showNewForm() {
+    document.getElementById("new-btn").classList.add("hidden");
+    document.getElementById("new-form-wrap").innerHTML = `
+      <form id="new-tt-form" class="inline-form glass">
+        <label><span>Name</span><input required id="tt-name" class="glass-input" /></label>
+        <label><span>Price (₦)</span><input required type="number" min="0" id="tt-price" class="glass-input" style="width:110px;" /></label>
+        <label><span>Quantity</span><input required type="number" min="1" id="tt-qty" class="glass-input" style="width:90px;" value="100" /></label>
+        <button type="submit" class="btn btn-primary btn-sm">Create</button>
+        <button type="button" id="cancel-new" class="btn btn-secondary btn-sm">Cancel</button>
+        <span id="new-tt-error" style="color:#f87171;font-size:12px;width:100%;"></span>
+      </form>`;
+
+    document.getElementById("cancel-new").addEventListener("click", () => {
+      document.getElementById("new-form-wrap").innerHTML = "";
+      document.getElementById("new-btn").classList.remove("hidden");
+    });
+
+    document.getElementById("new-tt-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("new-tt-error");
+      errorEl.textContent = "";
+      try {
+        await api("/api/admin/ticket-types", {
+          method: "POST",
+          body: JSON.stringify({
+            eventId,
+            name: document.getElementById("tt-name").value.trim(),
+            priceNaira: Number(document.getElementById("tt-price").value),
+            quantity: Number(document.getElementById("tt-qty").value),
+          }),
+        });
+        document.getElementById("new-form-wrap").innerHTML = "";
+        document.getElementById("new-btn").classList.remove("hidden");
+        await load();
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+  }
+</script>
+</body>
+</html>

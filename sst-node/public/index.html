@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Soundstage Tickets</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    color: white;
+    text-align: center;
+    padding: 88px 24px 80px;
+    background-color: #0b1530;
+    background-image: linear-gradient(120deg, #050a1a 0%, #0b1530 30%, #1a3a8f 60%, #050a1a 100%);
+  }
+  /* A single light beam sweeps across the stage once on load, like a
+     spotlight finding its mark - not a looping/decorative animation. */
+  .hero::before {
+    content: "";
+    position: absolute;
+    top: -20%;
+    left: -10%;
+    width: 55%;
+    height: 160%;
+    background: linear-gradient(100deg, transparent 40%, rgba(168, 85, 247, 0.16) 48%, rgba(125, 211, 255, 0.1) 52%, transparent 62%);
+    transform: translateX(-120%) rotate(8deg);
+    animation: stage-sweep 2.4s var(--ease-out) 0.2s 1 forwards;
+    pointer-events: none;
+  }
+  @keyframes stage-sweep {
+    to { transform: translateX(160%) rotate(8deg); }
+  }
+  .hero-content { position: relative; max-width: 720px; margin: 0 auto; }
+  .hero-logo {
+    width: 112px; height: 112px; margin: 0 auto 16px; border-radius: 20px; padding: 8px;
+    animation: hero-rise 0.7s var(--ease-out) both;
+  }
+  .hero-logo img { width: 100%; height: 100%; object-fit: contain; border-radius: 14px; }
+  .hero h1 {
+    font-size: 42px; font-weight: 800; letter-spacing: -0.03em; margin: 8px 0; line-height: 1.05;
+    animation: hero-rise 0.7s var(--ease-out) 0.08s both;
+  }
+  .hero-meta {
+    margin-top: 12px; color: var(--ice); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 10px; font-size: 15px;
+    animation: hero-rise 0.7s var(--ease-out) 0.16s both;
+  }
+  .hero-meta .sep { opacity: 0.4; }
+  @keyframes hero-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .countdown { display: flex; gap: 12px; justify-content: center; margin-top: 28px; }
+  .countdown .tile { min-width: 64px; padding: 10px 12px; border-radius: 12px; text-align: center; position: relative; }
+  .countdown .tile .num {
+    font-size: 25px; font-weight: 800; color: white; display: block; font-variant-numeric: tabular-nums;
+    animation: tick-pulse 1s var(--ease-out);
+  }
+  .countdown .tile .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ice); }
+  @keyframes tick-pulse {
+    0% { opacity: 0.3; transform: translateY(-3px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 20px; }
+  @media (min-width: 640px) { .info-grid { grid-template-columns: repeat(4, 1fr); } }
+  .info-block { border-radius: 12px; padding: 12px; }
+  .info-block .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(125,211,255,0.8); }
+  .info-block .value { margin-top: 4px; font-weight: 500; color: white; }
+
+  .ticket-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 20px; }
+  @media (min-width: 640px) { .ticket-grid { grid-template-columns: repeat(2, 1fr); } }
+  /* Each ticket sits under its own soft spotlight from above, rather
+     than a uniform card treatment - the VIP tier gets a warmer gold
+     beam instead of just a differently-colored icon. */
+  .ticket-card {
+    position: relative;
+    border-radius: 16px;
+    padding: 20px;
+    overflow: hidden;
+    transition: transform 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out);
+  }
+  .ticket-card::before {
+    content: "";
+    position: absolute;
+    top: -60%;
+    left: 50%;
+    width: 140%;
+    height: 100%;
+    background: radial-gradient(ellipse 50% 60% at 50% 0%, rgba(125, 211, 255, 0.14), transparent 70%);
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  /* VIP gets a stronger, static "premium" treatment - a warmer gold
+     glow, a soft gold border, and a subtle inner sheen. Nothing here
+     loops or auto-animates; it simply reads as premium at rest. */
+  .ticket-card.vip {
+    border-color: rgba(212, 175, 55, 0.35);
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.09), 0 4px 28px -6px rgba(212, 175, 55, 0.22),
+      0 0 0 1px rgba(212, 175, 55, 0.12);
+  }
+  .ticket-card.vip::before {
+    top: -70%;
+    height: 130%;
+    background: radial-gradient(ellipse 60% 65% at 50% 0%, rgba(212, 175, 55, 0.28), rgba(212, 175, 55, 0.06) 55%, transparent 75%);
+  }
+  .ticket-card.vip::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(155deg, rgba(212, 175, 55, 0.5), transparent 40%, transparent 60%, rgba(212, 175, 55, 0.25));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .ticket-card:hover {
+    transform: translateY(-2px);
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.09), 0 20px 44px -16px rgba(0, 0, 0, 0.6);
+  }
+  .ticket-card.vip:hover {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.09), 0 20px 44px -16px rgba(0, 0, 0, 0.6),
+      0 0 0 1px rgba(212, 175, 55, 0.2);
+  }
+  .ticket-card .title-row { display: flex; align-items: center; gap: 8px; position: relative; }
+  .ticket-card h3 { font-size: 17px; font-weight: 700; color: white; }
+  .ticket-card.vip h3 { color: #f3e3ae; }
+  .ticket-card .desc { font-size: 13px; color: rgba(232,238,252,0.55); margin-top: 4px; position: relative; }
+  .ticket-card .price { font-size: 25px; font-weight: 800; color: var(--ice); margin-top: 14px; position: relative; }
+  .ticket-card.vip .price { color: var(--gold); text-shadow: 0 0 18px rgba(212, 175, 55, 0.35); }
+  .ticket-card .remaining { font-size: 12px; color: rgba(232,238,252,0.4); margin-top: 2px; position: relative; }
+
+  /* Scroll-linked "glass mirror" shine: a highlight band on every glass
+     surface whose position is driven directly by scroll position (set
+     via --scroll-shine in JS on each scroll event) - not a timer or
+     looping animation, so it only ever moves because the user scrolls. */
+  .glass, .glass-raised {
+    background-image: linear-gradient(
+      100deg,
+      transparent calc(var(--scroll-shine, -40%) - 18%),
+      rgba(255, 255, 255, 0.09) var(--scroll-shine, -40%),
+      transparent calc(var(--scroll-shine, -40%) + 18%)
+    );
+    background-repeat: no-repeat;
+  }
+
+  #loading, #error-state { text-align: center; padding: 60px 24px; color: rgba(232,238,252,0.5); }
+</style>
+</head>
+<body>
+
+  <div id="loading">
+    <div class="sst-loading">
+      <svg class="sst-loading-figure" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path class="sst-wave sst-wave-1" d="M38 20c2 2.5 2 5.5 0 8" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <path class="sst-wave sst-wave-2" d="M41 17c3.5 4 3.5 9.5 0 14" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <path class="sst-wave sst-wave-3" d="M44 14c5 5.5 5 13 0 19" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <g class="sst-head">
+          <circle cx="22" cy="16" r="6" fill="#3b6dff"/>
+          <path d="M22 22c-6 0-10 4.5-10 10v6h20v-6c0-5.5-4-10-10-10Z" fill="#3b6dff"/>
+          <rect x="30" y="21" width="3" height="10" rx="1.5" fill="#e8eefc"/>
+          <circle cx="31.5" cy="19" r="3" fill="#e8eefc"/>
+        </g>
+      </svg>
+      <div class="sst-loading-text">Loading concert details…</div>
+    </div>
+  </div>
+  <div id="error-state" class="hidden">Could not load concert details. Please refresh.</div>
+
+  <main id="content" class="hidden">
+    <section class="hero">
+      <div class="hero-content">
+        <div class="hero-logo glass">
+          <img src="/assets/logo.jpg" alt="Soundstage Live Concert" />
+        </div>
+        <h1 id="event-name"></h1>
+        <div class="hero-meta">
+          <span id="event-date-full" style="display:inline-flex;align-items:center;gap:6px;"></span>
+          <span class="sep">·</span>
+          <span id="event-time"></span>
+          <span class="sep">·</span>
+          <span id="event-venue-inline" style="display:inline-flex;align-items:center;gap:6px;"></span>
+        </div>
+
+        <div class="countdown" id="countdown"></div>
+
+        <div style="margin-top:28px;">
+          <a href="#tickets" class="btn btn-primary" style="padding:16px 40px;font-size:15px;">Get Your Ticket</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="container section">
+      <h2 style="font-size:20px;font-weight:700;color:white;">About the Show</h2>
+      <p id="event-description" class="text-muted" style="line-height:1.6;margin-top:12px;white-space:pre-line;"></p>
+      <div class="info-grid">
+        <div class="info-block glass-inset"><div class="label">Date</div><div class="value" id="info-date"></div></div>
+        <div class="info-block glass-inset"><div class="label">Time</div><div class="value" id="info-time"></div></div>
+        <div class="info-block glass-inset"><div class="label">Venue</div><div class="value" id="info-venue"></div></div>
+        <div class="info-block glass-inset"><div class="label">Location</div><div class="value" id="info-address"></div></div>
+      </div>
+    </section>
+
+    <section class="container section" id="tickets">
+      <h2 style="font-size:20px;font-weight:700;color:white;">Choose Your Ticket</h2>
+      <div class="ticket-grid" id="ticket-grid"></div>
+    </section>
+  </main>
+
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script>
+  let eventData = null;
+  let countdownTimer = null;
+
+  async function init() {
+    try {
+      const data = await api("/api/event");
+      eventData = data.event;
+      render(data.event, data.ticketTypes);
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("content").classList.remove("hidden");
+    } catch (err) {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("error-state").classList.remove("hidden");
+    }
+  }
+
+  function render(event, ticketTypes) {
+    document.title = event.name + " | Soundstage Tickets";
+    document.getElementById("event-name").textContent = event.name;
+    document.getElementById("event-description").textContent = event.description;
+
+    const dateObj = new Date(event.date);
+    const fullDate = dateObj.toLocaleDateString("en-NG", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    document.getElementById("event-date-full").innerHTML = Icon("calendar", { size: 15 }) + " " + fullDate;
+    document.getElementById("event-time").textContent = event.time;
+    document.getElementById("event-venue-inline").innerHTML = Icon("map-pin", { size: 15 }) + " " + event.venue;
+
+    document.getElementById("info-date").textContent = dateObj.toDateString();
+    document.getElementById("info-time").textContent = event.time;
+    document.getElementById("info-venue").textContent = event.venue;
+    document.getElementById("info-address").textContent = event.address;
+
+    const grid = document.getElementById("ticket-grid");
+    grid.innerHTML = "";
+    ticketTypes.forEach((t) => {
+      const soldOut = t.status === "SOLD_OUT" || t.remaining === 0;
+      const isPremium = /vip/i.test(t.name);
+      const card = document.createElement("div");
+      card.className = "ticket-card glass" + (isPremium ? " vip" : "");
+      card.innerHTML = `
+        <div class="title-row">
+          ${Icon("ticket", { size: 16, color: isPremium ? "#D4AF37" : "#7DD3FF" })}
+          <h3>${escapeHtml(t.name)}</h3>
+        </div>
+        ${t.description ? `<div class="desc">${escapeHtml(t.description)}</div>` : ""}
+        <div class="price">${formatNaira(t.price)}</div>
+        <div class="remaining">${soldOut ? "Sold out" : t.remaining + " remaining"}</div>
+        <a href="${soldOut ? "#" : `/checkout?ticketTypeId=${t.id}&eventId=${event.id}`}"
+           class="btn btn-primary btn-block" style="margin-top:14px;${soldOut ? "opacity:0.4;pointer-events:none;" : ""}">
+          ${soldOut ? "Sold Out" : "Select"}
+        </a>`;
+      grid.appendChild(card);
+    });
+
+    startCountdown(event.date, event.time);
+  }
+
+  function startCountdown(dateStr, timeStr) {
+    const target = parseEventDateTime(dateStr, timeStr);
+    const el = document.getElementById("countdown");
+
+    function tick() {
+      const diff = target - Date.now();
+      const clamped = Math.max(diff, 0);
+      const days = Math.floor(clamped / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((clamped / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((clamped / (1000 * 60)) % 60);
+      const seconds = Math.floor((clamped / 1000) % 60);
+      el.innerHTML = [
+        ["Days", days],
+        ["Hours", hours],
+        ["Minutes", minutes],
+        ["Seconds", seconds],
+      ]
+        .map(
+          ([label, value]) =>
+            `<div class="tile glass"><span class="num">${String(value).padStart(2, "0")}</span><span class="label">${label}</span></div>`
+        )
+        .join("");
+    }
+    tick();
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = setInterval(tick, 1000);
+  }
+
+  function parseEventDateTime(dateStr, timeStr) {
+    // timeStr like "7:00 PM"
+    const d = new Date(dateStr);
+    const match = /(\d+):(\d+)\s*(AM|PM)/i.exec(timeStr || "");
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const isPM = /PM/i.test(match[3]);
+      if (isPM && hours !== 12) hours += 12;
+      if (!isPM && hours === 12) hours = 0;
+      d.setHours(hours, minutes, 0, 0);
+    }
+    return d.getTime();
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  init();
+</script>
+</body>
+</html>

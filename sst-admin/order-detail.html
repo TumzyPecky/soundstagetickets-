@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Order Detail | Sound Stage Tickets Admin</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .order-grid { display: grid; gap: 24px; margin-top: 24px; }
+  @media (min-width: 640px) { .order-grid { grid-template-columns: repeat(2, 1fr); } }
+  .order-section { border-radius: 16px; padding: 16px; }
+  .order-section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; color: rgba(125,211,255,0.8); }
+  .order-field-row { display: flex; justify-content: space-between; font-size: 14px; margin-top: 8px; }
+  .order-field-row .k { color: rgba(232,238,252,0.4); }
+  .order-field-row .v { font-weight: 500; color: white; }
+  .receipt-frame {
+    border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);
+    background: #000; margin-top: 12px;
+  }
+  .receipt-frame img { width: 100%; display: block; }
+  .decline-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex;
+    align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .decline-modal { width: 400px; max-width: 100%; border-radius: 16px; padding: 22px; }
+  .decline-modal textarea {
+    width: 100%; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px; color: white; padding: 10px 12px; font-family: inherit; font-size: 13px;
+    resize: vertical; min-height: 70px; margin: 10px 0 16px;
+  }
+</style>
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  const orderId = qs("id");
+
+  (async function () {
+    const ok = await requireAdminSession();
+    if (!ok) return;
+
+    renderAdminShell("/orders.html", `<div id="order-root" class="text-muted">Loading order…</div>`);
+
+    if (!orderId) {
+      document.getElementById("order-root").textContent = "No order specified.";
+      return;
+    }
+
+    try {
+      const data = await api(`/api/admin/orders/${encodeURIComponent(orderId)}`);
+      render(data.order);
+    } catch (err) {
+      document.getElementById("order-root").innerHTML = `<p style="color:#f87171;">${err.message}</p>`;
+    }
+  })();
+
+  function render(order) {
+    const root = document.getElementById("order-root");
+    root.className = "";
+    root.style.maxWidth = "760px";
+
+    root.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <h1>${order.orderNumber}</h1>
+          <p class="sub">Placed ${new Date(order.createdAt).toLocaleString()}</p>
+        </div>
+        ${statusPill(order.status)}
+      </div>
+
+      <div class="order-grid">
+        <div class="order-section glass">
+          <h2>Customer</h2>
+          ${row("Name", order.customer.fullName)}
+          ${row("Email", order.customer.email)}
+          ${row("Phone", order.customer.phone)}
+        </div>
+        <div class="order-section glass">
+          <h2>Delivery</h2>
+          ${row("Method", order.deliveryMethod)}
+          ${order.whatsappNumber ? row("WhatsApp", order.whatsappNumber) : ""}
+          ${row("Distributor", order.distributor ? `${order.distributor.name} (${order.distributor.referralCode})` : "—")}
+        </div>
+        <div class="order-section glass">
+          <h2>Order</h2>
+          ${order.orderItems
+            .map((i) => row(i.ticketType.name, `${i.quantity} × ${formatNaira(i.unitPrice)} = ${formatNaira(i.total)}`))
+            .join("")}
+          ${row("Total", formatNaira(order.total))}
+        </div>
+        <div class="order-section glass">
+          <h2>Payment</h2>
+          ${row("Status", order.status)}
+          ${row("Amount", formatNaira(order.total))}
+          ${row("Receipt Uploaded", order.receiptUploadedAt ? new Date(order.receiptUploadedAt).toLocaleString() : "—")}
+          ${row("Reviewed", order.reviewedAt ? new Date(order.reviewedAt).toLocaleString() : "—")}
+          ${order.status === "DECLINED" && order.declineReason ? row("Decline Reason", order.declineReason) : ""}
+        </div>
+      </div>
+
+      ${
+        order.receiptImage
+          ? `<div class="order-section glass" style="margin-top:24px;">
+              <h2>Payment Receipt</h2>
+              <div class="receipt-frame">
+                <img src="${order.receiptImage}" alt="Payment receipt uploaded by ${escapeHtml(order.customer.fullName)}" />
+              </div>
+            </div>`
+          : `<div class="order-section glass" style="margin-top:24px;">
+              <h2>Payment Receipt</h2>
+              <p class="text-faint" style="font-size:13px;margin-top:8px;">No receipt uploaded yet.</p>
+            </div>`
+      }
+
+      <div class="order-section glass" style="margin-top:24px;">
+        <h2>Tickets</h2>
+        ${
+          order.tickets.length === 0
+            ? `<p class="text-faint" style="font-size:13px;margin-top:8px;">No tickets issued yet.</p>`
+            : order.tickets
+                .map(
+                  (t) =>
+                    `<div style="display:flex;justify-content:space-between;font-size:14px;margin-top:8px;"><span style="font-family:monospace;color:rgba(232,238,252,0.8);">${t.ticketNumber}</span>${statusPill(t.status)}</div>`
+                )
+                .join("")
+        }
+      </div>
+
+      <div class="order-section glass" style="margin-top:24px;">
+        <h2>Notifications</h2>
+        ${
+          order.notifications.length === 0
+            ? `<p class="text-faint" style="font-size:13px;margin-top:8px;">No notifications sent yet.</p>`
+            : order.notifications
+                .map(
+                  (n) =>
+                    `<div style="display:flex;justify-content:space-between;font-size:14px;margin-top:8px;"><span style="color:rgba(232,238,252,0.8);">${n.type} · ${n.channel}</span>${statusPill(n.status)}</div>`
+                )
+                .join("")
+        }
+      </div>
+
+      <div style="margin-top:24px;display:flex;gap:12px;" id="action-buttons"></div>
+    `;
+
+    const actions = document.getElementById("action-buttons");
+    if (order.status === "PENDING_REVIEW") {
+      actions.innerHTML = `
+        <button class="btn btn-primary btn-sm" id="approve-btn">${Icon("thumbs-up", { size: 14 })} Accept</button>
+        <button class="btn btn-secondary btn-sm" id="decline-btn" style="color:#f87171;border-color:rgba(248,113,113,0.3);">${Icon("x-circle", { size: 14 })} Decline</button>`;
+      document.getElementById("approve-btn").onclick = async () => {
+        if (!confirm(`Confirm you've received ${formatNaira(order.total)} from ${order.customer.fullName} and issue their ticket?`)) return;
+        const btn = document.getElementById("approve-btn");
+        btn.disabled = true;
+        btn.textContent = "Approving…";
+        try {
+          await api(`/api/admin/orders/${order.id}/approve`, { method: "POST" });
+          location.reload();
+        } catch (err) {
+          alert(err.message || "Could not approve this order.");
+          btn.disabled = false;
+        }
+      };
+      document.getElementById("decline-btn").onclick = () => openDeclineModal(order);
+    } else if (order.status === "PAID") {
+      actions.innerHTML = `
+        <button class="btn btn-secondary btn-sm" id="resend-btn">Resend Ticket</button>
+        <button class="btn btn-secondary btn-sm" id="refund-btn">Refund Order</button>`;
+      document.getElementById("resend-btn").onclick = async () => {
+        await api(`/api/admin/orders/${order.id}/resend`, { method: "POST" });
+        alert("Ticket email resent.");
+      };
+      document.getElementById("refund-btn").onclick = async () => {
+        if (!confirm("Refund this order? This marks it refunded here for your records. Actually returning the customer's money must still be done via your bank/OPay app.")) return;
+        await api(`/api/admin/orders/${order.id}`, { method: "PATCH", body: JSON.stringify({ status: "REFUNDED" }) });
+        location.reload();
+      };
+    } else if (order.status === "AWAITING_RECEIPT") {
+      actions.innerHTML = `<button class="btn btn-secondary btn-sm" id="cancel-btn">Cancel Order</button>`;
+      document.getElementById("cancel-btn").onclick = async () => {
+        if (!confirm("Cancel this order? The customer hasn't uploaded a receipt yet.")) return;
+        await api(`/api/admin/orders/${order.id}`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) });
+        location.reload();
+      };
+    }
+  }
+
+  function openDeclineModal(order) {
+    const overlay = document.createElement("div");
+    overlay.className = "decline-modal-overlay";
+    overlay.innerHTML = `
+      <div class="decline-modal glass-raised">
+        <h3 style="color:white;font-size:16px;margin-bottom:4px;">Decline this receipt?</h3>
+        <p class="text-muted" style="font-size:13px;">This order will be marked declined. No ticket will be issued.</p>
+        <textarea id="decline-reason" placeholder="Optional: reason shown to the customer, e.g. 'Amount doesn't match' or 'Screenshot unclear, please re-upload'"></textarea>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-secondary btn-sm" id="decline-cancel" style="flex:1;">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="decline-confirm" style="flex:1;background:#dc2626;">Decline Order</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    document.getElementById("decline-cancel").onclick = () => overlay.remove();
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById("decline-confirm").onclick = async () => {
+      const reason = document.getElementById("decline-reason").value.trim();
+      const btn = document.getElementById("decline-confirm");
+      btn.disabled = true;
+      btn.textContent = "Declining…";
+      try {
+        await api(`/api/admin/orders/${order.id}/decline`, { method: "POST", body: JSON.stringify({ reason }) });
+        location.reload();
+      } catch (err) {
+        alert(err.message || "Could not decline this order.");
+        btn.disabled = false;
+        btn.textContent = "Decline Order";
+      }
+    };
+  }
+
+  function row(label, value) {
+    return `<div class="order-field-row"><span class="k">${label}</span><span class="v">${value}</span></div>`;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+</script>
+</body>
+</html>

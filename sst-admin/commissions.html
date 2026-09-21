@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Commissions | Sound Stage Tickets Admin</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  (async function () {
+    const ok = await requireAdminSession();
+    if (!ok) return;
+
+    renderAdminShell("/commissions.html", `
+      <h1>Commissions</h1>
+      <div class="table-wrap glass" style="margin-top:16px;">
+        <table>
+          <thead><tr><th>Distributor</th><th>Order</th><th>Rate</th><th>Amount</th><th>Status</th><th>Paid At</th><th>Actions</th></tr></thead>
+          <tbody id="comm-body"></tbody>
+        </table>
+      </div>
+    `);
+
+    await load();
+  })();
+
+  async function load() {
+    try {
+      const data = await api("/api/admin/commissions");
+      document.getElementById("comm-body").innerHTML = data.commissions.length
+        ? data.commissions.map(rowHtml).join("")
+        : `<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">No commissions yet.</td></tr>`;
+      data.commissions.forEach(wireRow);
+    } catch (err) {
+      document.getElementById("comm-body").innerHTML = `<tr><td colspan="7" style="color:#f87171;padding:16px;">${err.message}</td></tr>`;
+    }
+  }
+
+  function rowHtml(c) {
+    return `
+      <tr data-id="${c.id}">
+        <td class="strong">${c.distributor ? c.distributor.name : "—"}</td>
+        <td>${c.order ? c.order.orderNumber : "—"}</td>
+        <td>${c.type === "PERCENTAGE" ? (c.rate * 100).toFixed(1) + "%" : "Fixed"}</td>
+        <td>${formatNaira(c.amount)}</td>
+        <td>${statusPill(c.status)}</td>
+        <td style="font-size:12px;color:rgba(232,238,252,0.4);">${c.paidAt ? new Date(c.paidAt).toLocaleDateString() : "—"}</td>
+        <td>
+          <div style="display:flex;gap:6px;">
+            ${c.status === "PENDING" ? `<button class="btn btn-secondary btn-sm approve-btn">Approve</button>` : ""}
+            ${c.status === "APPROVED" ? `<button class="btn btn-secondary btn-sm paid-btn">Mark Paid</button>` : ""}
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  function wireRow(c) {
+    const tr = document.querySelector(`tr[data-id="${c.id}"]`);
+    if (!tr) return;
+    const approveBtn = tr.querySelector(".approve-btn");
+    const paidBtn = tr.querySelector(".paid-btn");
+    if (approveBtn) approveBtn.addEventListener("click", () => updateStatus(c.id, "APPROVED"));
+    if (paidBtn)
+      paidBtn.addEventListener("click", () => {
+        if (!confirm("Confirm the payout was sent to this distributor outside the system before marking as paid.")) return;
+        updateStatus(c.id, "PAID");
+      });
+  }
+
+  async function updateStatus(id, status) {
+    await api(`/api/admin/commissions/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+    load();
+  }
+</script>
+</body>
+</html>

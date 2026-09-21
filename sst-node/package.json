@@ -1,0 +1,14 @@
+{
+  "name": "sound-stage-tickets",
+  "version": "1.0.0",
+  "description": "Sound Stage Tickets - plain Node.js + HTML ticketing site with admin panel",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "seed": "node src/seed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}

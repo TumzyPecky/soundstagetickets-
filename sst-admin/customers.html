@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Customers | Sound Stage Tickets Admin</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  (async function () {
+    const ok = await requireAdminSession();
+    if (!ok) return;
+
+    renderAdminShell("/customers.html", `
+      <h1>Customers</h1>
+      <form id="filter-form" class="toolbar" style="margin-top:16px;">
+        <div class="search-input-wrap">
+          ${Icon("search", { size: 14 })}
+          <input type="text" id="q" placeholder="Search by name, email, or phone" class="glass-input" style="width:280px;" />
+        </div>
+      </form>
+      <div class="table-wrap glass" style="margin-top:16px;">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Tickets Purchased</th><th>Total Spent</th></tr></thead>
+          <tbody id="customers-body"></tbody>
+        </table>
+      </div>
+    `);
+
+    async function load() {
+      const q = document.getElementById("q").value.trim();
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+
+      try {
+        const data = await api(`/api/admin/customers?${params.toString()}`);
+        document.getElementById("customers-body").innerHTML = data.customers.length
+          ? data.customers
+              .map(
+                (c) => `
+          <tr>
+            <td class="strong">${c.fullName}</td>
+            <td>${c.email}</td>
+            <td>${c.phone}</td>
+            <td>${c.ticketsPurchased}</td>
+            <td>${formatNaira(c.totalSpent)}</td>
+          </tr>`
+              )
+              .join("")
+          : `<tr><td colspan="5" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">No customers found.</td></tr>`;
+      } catch (err) {
+        document.getElementById("customers-body").innerHTML = `<tr><td colspan="5" style="color:#f87171;padding:16px;">${err.message}</td></tr>`;
+      }
+    }
+
+    document.getElementById("filter-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      load();
+    });
+    document.getElementById("q").addEventListener("input", () => load());
+
+    load();
+  })();
+</script>
+</body>
+</html>

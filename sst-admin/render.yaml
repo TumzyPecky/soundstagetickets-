@@ -1,0 +1,27 @@
+# This admin panel is pure static HTML/CSS/JS, so it's cheapest and
+# simplest to deploy as a Render Static Site (no server process, free
+# CDN hosting). The included server.js is only there for local testing
+# or if you'd rather run it as a tiny Node web service instead - see the
+# commented-out alternative below.
+
+services:
+  - type: web
+    name: sound-stage-tickets-admin
+    runtime: static
+    buildCommand: "true"
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+# Alternative: deploy as a Node web service instead of a static site
+# (uncomment this and remove the block above if you prefer):
+#
+# services:
+#   - type: web
+#     name: sound-stage-tickets-admin
+#     runtime: node
+#     plan: free
+#     buildCommand: npm install
+#     startCommand: npm start

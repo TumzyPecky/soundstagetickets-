@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Payment Status | Soundstage Tickets</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .status-wrap {
+    max-width: 480px; margin: 0 auto; min-height: 70vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px;
+  }
+  .status-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+  }
+  .status-icon.success { background: rgba(16,185,129,0.15); color: #34d399; }
+  .status-icon.failed { background: rgba(239,68,68,0.15); color: #f87171; }
+  .status-icon.pending { background: rgba(59,109,255,0.15); color: var(--ice); }
+</style>
+</head>
+<body>
+  <main class="status-wrap">
+    <div id="status-icon" class="status-icon pending"></div>
+    <h1 id="status-title" style="color:white;font-size:20px;font-weight:700;">One moment…</h1>
+    <p id="status-message" class="text-muted" style="margin-top:8px;">Confirming your payment…</p>
+    <a id="ticket-link" href="#" class="btn btn-primary hidden" style="margin-top:20px;">View My Ticket</a>
+    <a href="/" class="btn btn-outline" style="margin-top:12px;">Back to Soundstage Tickets</a>
+  </main>
+
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script>
+  const orderId = qs("orderId");
+  let pollTimer = null;
+
+  async function init(attempt = 1) {
+    if (!orderId) {
+      setState("failed", "Order not found", "No order reference found.");
+      return;
+    }
+    try {
+      const data = await api(`/api/orders/${encodeURIComponent(orderId)}/status`);
+
+      if (data.status === "PAID") {
+        setState("success", "You're all set", "Your payment was confirmed! Your ticket has been emailed to you.");
+        if (data.tickets && data.tickets.length > 0) {
+          const link = document.getElementById("ticket-link");
+          link.href = `/ticket/${encodeURIComponent(data.tickets[0])}`;
+          link.textContent = data.tickets.length > 1 ? `View My Tickets (${data.tickets.length})` : "View My Ticket";
+          link.classList.remove("hidden");
+        }
+      } else if (data.status === "DECLINED") {
+        setState(
+          "failed",
+          "Receipt declined",
+          data.declineReason || "We couldn't confirm your payment from the receipt you uploaded. Please contact us or try again."
+        );
+      } else if (data.status === "PENDING_REVIEW") {
+        setState("pending", "Awaiting confirmation", "Your receipt is being reviewed. You'll receive your ticket by email once it's confirmed.");
+        // Reviews are done by a person, not automatically - so this
+        // checks back occasionally rather than retrying fast. It stops
+        // after a while rather than polling forever in the background;
+        // the customer will get an email regardless once approved.
+        if (attempt < 20) {
+          pollTimer = setTimeout(() => init(attempt + 1), 15000);
+        }
+      } else {
+        setState("pending", "Awaiting your receipt", "This order hasn't received a payment receipt yet.");
+      }
+    } catch (err) {
+      setState("failed", "Something went wrong", err.message || "We couldn't check this order's status.");
+    }
+  }
+
+  function setState(kind, title, message) {
+    const iconMap = { success: "check-circle", failed: "alert-triangle", pending: "clock" };
+    const el = document.getElementById("status-icon");
+    el.className = "status-icon " + kind;
+    el.innerHTML = Icon(iconMap[kind], { size: 28 });
+    document.getElementById("status-title").textContent = title;
+    document.getElementById("status-message").textContent = message;
+  }
+
+  init();
+</script>
+</body>
+</html>

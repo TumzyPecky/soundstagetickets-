@@ -1,0 +1,13 @@
+{
+  "name": "sound-stage-tickets-admin",
+  "version": "1.0.0",
+  "description": "Sound Stage Tickets - standalone admin panel (static site, talks to the backend API over HTTP)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}

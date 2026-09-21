@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Distributors | Sound Stage Tickets Admin</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  (async function () {
+    const ok = await requireAdminSession();
+    if (!ok) return;
+
+    renderAdminShell("/distributors.html", `
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h1>Distributors</h1>
+        <button class="btn btn-primary btn-sm" id="new-btn">${Icon("plus", { size: 14 })} New Distributor</button>
+      </div>
+      <div id="new-form-wrap" style="margin-top:16px;"></div>
+      <div class="table-wrap glass" style="margin-top:16px;">
+        <table>
+          <thead><tr><th>Distributor</th><th>Referral Code</th><th>Clicks</th><th>Customers</th><th>Tickets Sold</th><th>Revenue</th><th>Commission</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="dist-body"></tbody>
+        </table>
+      </div>
+    `);
+
+    document.getElementById("new-btn").addEventListener("click", showNewForm);
+    await load();
+  })();
+
+  async function load() {
+    try {
+      const data = await api("/api/admin/distributors");
+      document.getElementById("dist-body").innerHTML = data.distributors.length
+        ? data.distributors.map(rowHtml).join("")
+        : `<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">No distributors yet.</td></tr>`;
+      data.distributors.forEach(wireRow);
+    } catch (err) {
+      document.getElementById("dist-body").innerHTML = `<tr><td colspan="9" style="color:#f87171;padding:16px;">${err.message}</td></tr>`;
+    }
+  }
+
+  function rowHtml(d) {
+    return `
+      <tr data-id="${d.id}">
+        <td><div class="strong" style="color:white;">${d.name}</div><div style="font-size:12px;color:rgba(232,238,252,0.4);">${d.email}</div></td>
+        <td style="font-family:monospace;font-size:12px;">${d.referralCode}</td>
+        <td>${d.clicks}</td>
+        <td>${d.customers}</td>
+        <td>${d.ticketsSold}</td>
+        <td>${formatNaira(d.revenue)}</td>
+        <td>${formatNaira(d.commissionTotal)}</td>
+        <td>${statusPill(d.status)}</td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${d.status !== "ACTIVE" ? `<button class="btn btn-secondary btn-sm approve-btn">Approve</button>` : ""}
+            ${d.status !== "SUSPENDED" ? `<button class="btn btn-secondary btn-sm suspend-btn">Suspend</button>` : ""}
+            ${d.status === "ACTIVE" ? `<button class="btn btn-primary btn-sm issue-btn">Issue Tickets</button>` : ""}
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  function wireRow(d) {
+    const tr = document.querySelector(`tr[data-id="${d.id}"]`);
+    if (!tr) return;
+    const approveBtn = tr.querySelector(".approve-btn");
+    const suspendBtn = tr.querySelector(".suspend-btn");
+    const issueBtn = tr.querySelector(".issue-btn");
+    if (approveBtn) approveBtn.addEventListener("click", () => updateStatus(d.id, "ACTIVE"));
+    if (suspendBtn) suspendBtn.addEventListener("click", () => updateStatus(d.id, "SUSPENDED"));
+    if (issueBtn) issueBtn.addEventListener("click", () => openIssueModal(d));
+  }
+
+  async function updateStatus(id, status) {
+    await api(`/api/admin/distributors/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
+    load();
+  }
+
+  async function openIssueModal(distributor) {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;";
+    overlay.innerHTML = `
+      <div class="glass-raised" style="width:420px;max-width:100%;border-radius:16px;padding:22px;">
+        <h3 style="color:white;font-size:16px;margin-bottom:4px;">Issue Tickets to ${distributor.name}</h3>
+        <p style="color:rgba(232,238,252,0.5);font-size:13px;margin-bottom:16px;">Record a bulk purchase this distributor already paid you for. Tickets are issued immediately — no receipt needed.</p>
+        <form id="issue-form">
+          <label style="display:block;margin-bottom:12px;">
+            <span style="display:block;font-size:12px;color:rgba(232,238,252,0.6);margin-bottom:4px;">Ticket Type</span>
+            <select id="issue-ticket-type" class="glass-input" style="width:100%;" required></select>
+          </label>
+          <label style="display:block;margin-bottom:16px;">
+            <span style="display:block;font-size:12px;color:rgba(232,238,252,0.6);margin-bottom:4px;">Quantity</span>
+            <input type="number" id="issue-quantity" class="glass-input" style="width:100%;" min="1" max="20" value="5" required />
+          </label>
+          <div id="issue-error" style="color:#f87171;font-size:12px;margin-bottom:12px;"></div>
+          <div style="display:flex;gap:10px;">
+            <button type="button" id="issue-cancel" class="btn btn-secondary btn-sm" style="flex:1;">Cancel</button>
+            <button type="submit" id="issue-submit" class="btn btn-primary btn-sm" style="flex:1;">Issue Tickets</button>
+          </div>
+        </form>
+        <div id="issue-result" class="hidden"></div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    document.getElementById("issue-cancel").addEventListener("click", () => overlay.remove());
+
+    // Load available ticket types into the dropdown
+    const select = document.getElementById("issue-ticket-type");
+    try {
+      const data = await api("/api/tickets");
+      select.innerHTML = data.ticketTypes
+        .map((t) => `<option value="${t.id}" ${t.remaining < 1 ? "disabled" : ""}>${t.name} — ${formatNaira(t.price)} (${t.remaining} left)</option>`)
+        .join("");
+    } catch (err) {
+      select.innerHTML = `<option value="">Could not load ticket types</option>`;
+    }
+
+    document.getElementById("issue-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("issue-error");
+      errorEl.textContent = "";
+      const ticketTypeId = select.value;
+      const quantity = Number(document.getElementById("issue-quantity").value);
+      const submitBtn = document.getElementById("issue-submit");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Issuing…";
+
+      try {
+        const result = await api(`/api/admin/distributors/${distributor.id}/bulk-issue`, {
+          method: "POST",
+          body: JSON.stringify({ ticketTypeId, quantity }),
+        });
+        document.getElementById("issue-form").classList.add("hidden");
+        const resultEl = document.getElementById("issue-result");
+        resultEl.classList.remove("hidden");
+        resultEl.innerHTML = `
+          <div style="text-align:center;padding:8px 0 4px;">
+            <div style="font-size:32px;margin-bottom:6px;">✅</div>
+            <p style="color:white;font-size:14px;margin-bottom:4px;">${result.tickets.length} × ${result.ticketType} ticket${result.tickets.length > 1 ? "s" : ""} issued</p>
+            <p style="color:rgba(232,238,252,0.5);font-size:12px;margin-bottom:14px;">Order ${result.order.orderNumber}</p>
+          </div>
+          <div class="glass-inset" style="border-radius:10px;padding:12px 14px;margin-bottom:16px;max-height:200px;overflow-y:auto;">
+            ${result.tickets.map((t) => `<div style="font-family:monospace;font-size:13px;color:#7dd3ff;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.06);">${t}</div>`).join("")}
+          </div>
+          <button type="button" id="issue-copy" class="btn btn-secondary btn-sm" style="width:100%;margin-bottom:8px;">Copy Ticket Numbers</button>
+          <button type="button" id="issue-done" class="btn btn-primary btn-sm" style="width:100%;">Done</button>`;
+
+        document.getElementById("issue-copy").addEventListener("click", () => {
+          navigator.clipboard.writeText(result.tickets.join("\n"));
+          const btn = document.getElementById("issue-copy");
+          btn.textContent = "Copied ✓";
+          setTimeout(() => { btn.textContent = "Copy Ticket Numbers"; }, 1500);
+        });
+        document.getElementById("issue-done").addEventListener("click", () => {
+          overlay.remove();
+          load();
+        });
+      } catch (err) {
+        errorEl.textContent = err.message || "Could not issue tickets.";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Issue Tickets";
+      }
+    });
+  }
+
+  function showNewForm() {
+    document.getElementById("new-btn").classList.add("hidden");
+    document.getElementById("new-form-wrap").innerHTML = `
+      <form id="new-dist-form" class="inline-form glass">
+        <label><span>Name</span><input required id="d-name" class="glass-input" /></label>
+        <label><span>Email</span><input required type="email" id="d-email" class="glass-input" /></label>
+        <label><span>Phone</span><input required id="d-phone" class="glass-input" /></label>
+        <label><span>Commission %</span><input type="number" min="0" max="100" step="1" id="d-rate" class="glass-input" style="width:80px;" value="10" /></label>
+        <button type="submit" class="btn btn-primary btn-sm">Create</button>
+        <button type="button" id="cancel-new" class="btn btn-secondary btn-sm">Cancel</button>
+        <span id="new-dist-error" style="color:#f87171;font-size:12px;width:100%;"></span>
+      </form>`;
+
+    document.getElementById("cancel-new").addEventListener("click", () => {
+      document.getElementById("new-form-wrap").innerHTML = "";
+      document.getElementById("new-btn").classList.remove("hidden");
+    });
+
+    document.getElementById("new-dist-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("new-dist-error");
+      errorEl.textContent = "";
+      try {
+        await api("/api/admin/distributors", {
+          method: "POST",
+          body: JSON.stringify({
+            name: document.getElementById("d-name").value.trim(),
+            email: document.getElementById("d-email").value.trim(),
+            phone: document.getElementById("d-phone").value.trim(),
+            commissionRate: Number(document.getElementById("d-rate").value) / 100,
+          }),
+        });
+        document.getElementById("new-form-wrap").innerHTML = "";
+        document.getElementById("new-btn").classList.remove("hidden");
+        await load();
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Your Ticket | Soundstage Tickets</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .ticket-wrap { max-width: 420px; margin: 0 auto; padding: 40px 24px; }
+  .ticket-card { border-radius: 16px; overflow: hidden; }
+  .ticket-header { display: flex; align-items: center; justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); padding: 16px; }
+  .ticket-header img { width: 40px; height: 40px; border-radius: 8px; object-fit: contain; }
+  .ticket-body { padding: 24px; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 16px; margin-top: 16px; }
+  .detail-label { font-size: 11px; text-transform: uppercase; color: rgba(232,238,252,0.4); }
+  .detail-value { font-weight: 500; color: white; margin-top: 2px; }
+  .detail-value.mono { font-family: ui-monospace, monospace; }
+  .detail-value.valid { color: #34d399; }
+  .notice { display: flex; align-items: flex-start; gap: 8px; border-radius: 12px; padding: 12px; font-size: 12px; color: rgba(232,238,252,0.55); margin-top: 16px; }
+</style>
+</head>
+<body>
+  <main class="ticket-wrap">
+    <div id="loading" class="sst-loading">
+      <svg class="sst-loading-figure" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path class="sst-wave sst-wave-1" d="M38 20c2 2.5 2 5.5 0 8" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <path class="sst-wave sst-wave-2" d="M41 17c3.5 4 3.5 9.5 0 14" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <path class="sst-wave sst-wave-3" d="M44 14c5 5.5 5 13 0 19" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <g class="sst-head">
+          <circle cx="22" cy="16" r="6" fill="#3b6dff"/>
+          <path d="M22 22c-6 0-10 4.5-10 10v6h20v-6c0-5.5-4-10-10-10Z" fill="#3b6dff"/>
+          <rect x="30" y="21" width="3" height="10" rx="1.5" fill="#e8eefc"/>
+          <circle cx="31.5" cy="19" r="3" fill="#e8eefc"/>
+        </g>
+      </svg>
+      <div class="sst-loading-text">Loading ticket…</div>
+    </div>
+    <div id="not-found" class="hidden" style="text-align:center;">
+      <p class="text-muted">Ticket not found.</p>
+      <a href="/" class="btn btn-primary" style="margin-top:12px;">Back to Soundstage Tickets</a>
+    </div>
+
+    <div id="ticket-content" class="ticket-card glass-raised hidden">
+      <div class="ticket-header">
+        <img src="/assets/logo.jpg" alt="Soundstage Live Concert" />
+      </div>
+      <div class="ticket-body">
+        <h1 id="event-name" style="color:white;font-size:17px;font-weight:700;"></h1>
+        <p id="event-datetime" class="text-muted" style="font-size:13px;margin-top:4px;"></p>
+        <p id="event-venue" class="text-muted" style="font-size:13px;"></p>
+
+        <div class="detail-grid">
+          <div><div class="detail-label">Customer</div><div class="detail-value" id="customer-name"></div></div>
+          <div><div class="detail-label">Ticket</div><div class="detail-value" id="ticket-type"></div></div>
+          <div><div class="detail-label">Ticket ID</div><div class="detail-value mono" id="ticket-number"></div></div>
+          <div><div class="detail-label">Status</div><div class="detail-value" id="ticket-status"></div></div>
+        </div>
+
+        <div class="notice glass-inset">
+          <span id="notice-icon"></span>
+          <span>Keep this ticket available for entry. This ticket is non-transferable unless otherwise stated by the organizer.</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script>
+  const ticketNumber = window.location.pathname.split("/ticket/")[1];
+
+  document.getElementById("notice-icon").innerHTML = Icon("ticket", { size: 14, color: "#7DD3FF" });
+
+  async function init() {
+    try {
+      const data = await api(`/api/ticket/${encodeURIComponent(ticketNumber)}`);
+      document.getElementById("event-name").textContent = data.event.name;
+      document.getElementById("event-datetime").textContent =
+        new Date(data.event.date).toDateString() + " · " + data.event.time;
+      document.getElementById("event-venue").textContent = data.event.venue;
+      document.getElementById("customer-name").textContent = data.customerName;
+      document.getElementById("ticket-type").textContent = data.ticketTypeName;
+      document.getElementById("ticket-number").textContent = data.ticket.ticketNumber;
+
+      const statusEl = document.getElementById("ticket-status");
+      statusEl.textContent = data.ticket.status;
+      if (data.ticket.status === "VALID") statusEl.classList.add("valid");
+
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("ticket-content").classList.remove("hidden");
+    } catch (err) {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("not-found").classList.remove("hidden");
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

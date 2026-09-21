@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Dashboard | Sound Stage Tickets Admin</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  (async function () {
+    const ok = await requireAdminSession();
+    if (!ok) return;
+
+    renderAdminShell("/index.html", `
+      <h1>Dashboard</h1>
+      <p class="sub">Overview of Sound Stage Tickets performance.</p>
+      <div class="stat-grid" id="stat-grid"></div>
+      <div class="admin-section-title">Ticket Types</div>
+      <div class="table-wrap glass">
+        <table>
+          <thead><tr><th>Name</th><th>Price</th><th>Total</th><th>Sold</th><th>Remaining</th><th>Status</th></tr></thead>
+          <tbody id="ticket-types-body"></tbody>
+        </table>
+      </div>
+      <div class="admin-section-title">Recent Orders</div>
+      <div class="table-wrap glass">
+        <table>
+          <thead><tr><th>Order</th><th>Customer</th><th>Ticket</th><th>Amount</th><th>Distributor</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody id="orders-body"></tbody>
+        </table>
+      </div>
+    `);
+
+    try {
+      const data = await api("/api/admin/dashboard");
+
+      const stats = [
+        ["Total Revenue", formatNaira(data.totalRevenue)],
+        ["Tickets Sold", data.ticketsSold.toLocaleString()],
+        ["Tickets Remaining", data.ticketsRemaining.toLocaleString()],
+        ["Successful Payments", data.successfulPayments.toLocaleString()],
+        ["Pending Review", data.pendingReview.toLocaleString()],
+        ["Declined", data.declinedPayments.toLocaleString()],
+        ["Customers", data.customerCount.toLocaleString()],
+        ["Distributors", data.distributorCount.toLocaleString()],
+        ["Distributor Sales", formatNaira(data.distributorSales)],
+        ["Total Commissions", formatNaira(data.totalCommissions)],
+      ];
+      document.getElementById("stat-grid").innerHTML = stats
+        .map(([label, value]) => `<div class="stat-card glass"><div class="label">${label}</div><div class="value">${value}</div></div>`)
+        .join("");
+
+      document.getElementById("ticket-types-body").innerHTML = data.ticketTypes
+        .map(
+          (t) => `
+        <tr>
+          <td class="strong">${t.name}</td>
+          <td>${formatNaira(t.price)}</td>
+          <td>${t.quantity}</td>
+          <td>${t.soldQuantity}</td>
+          <td>${Math.max(t.quantity - t.soldQuantity, 0)}</td>
+          <td>${statusPill(t.status)}</td>
+        </tr>`
+        )
+        .join("");
+
+      document.getElementById("orders-body").innerHTML = data.recentOrders.length
+        ? data.recentOrders
+            .map(
+              (o) => `
+        <tr>
+          <td><a href="/order-detail.html?id=${o.id}" style="color:var(--ice);">${o.orderNumber}</a></td>
+          <td><div class="strong" style="color:white;">${o.customer.fullName}</div><div style="font-size:12px;color:rgba(232,238,252,0.4);">${o.customer.email}</div></td>
+          <td>${o.orderItems.map((i) => `${i.quantity}x ${i.ticketType.name}`).join(", ")}</td>
+          <td>${formatNaira(o.total)}</td>
+          <td>${o.distributor ? o.distributor.name : "—"}</td>
+          <td>${statusPill(o.status)}</td>
+          <td style="font-size:12px;color:rgba(232,238,252,0.4);">${new Date(o.createdAt).toLocaleDateString()}</td>
+        </tr>`
+            )
+            .join("")
+        : `<tr><td colspan="7" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">No orders yet.</td></tr>`;
+    } catch (err) {
+      document.getElementById("admin-content").innerHTML += `<p style="color:#f87171;margin-top:16px;">${err.message}</p>`;
+    }
+  })();
+</script>
+</body>
+</html>

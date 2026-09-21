@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Checkout | Soundstage Tickets</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .checkout-wrap { max-width: 480px; margin: 0 auto; padding: 40px 24px; }
+  .qty-row { display: flex; align-items: center; justify-content: space-between; }
+  .qty-controls { display: flex; align-items: center; gap: 8px; }
+  .qty-btn {
+    width: 28px; height: 28px; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15); background: transparent; color: white;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .qty-btn:hover { background: rgba(255,255,255,0.1); }
+  .delivery-options { display: flex; gap: 12px; }
+  .delivery-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(232,238,252,0.55); font-size: 14px; font-weight: 500; background: transparent;
+  }
+  .delivery-btn.active { border-color: var(--blue); background: rgba(59,109,255,0.15); color: white; }
+  .summary-row { display: flex; justify-content: space-between; font-size: 14px; color: rgba(232,238,252,0.75); }
+  .summary-total { display: flex; justify-content: space-between; font-weight: 700; color: white; margin-top: 8px; }
+
+  .bank-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .bank-row:last-child { border-bottom: none; }
+  .bank-row .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(125,211,255,0.8); }
+  .bank-row .value { font-size: 15px; font-weight: 600; color: white; margin-top: 2px; }
+  .copy-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: white; border-radius: 8px; padding: 6px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 5px; }
+  .copy-btn:hover { background: rgba(255,255,255,0.14); }
+  .copy-btn.copied { background: rgba(53,201,122,0.18); border-color: rgba(53,201,122,0.4); color: #6ee7a8; }
+
+  .upload-zone {
+    border: 2px dashed rgba(255,255,255,0.15); border-radius: 14px; padding: 28px 20px;
+    text-align: center; cursor: pointer; transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--blue); background: rgba(59,109,255,0.06); }
+  .upload-zone .upload-icon { color: var(--ice); margin-bottom: 8px; }
+  .upload-preview { display: none; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); margin-top: 12px; }
+  .upload-preview.visible { display: block; }
+  .upload-preview img { width: 100%; display: block; max-height: 360px; object-fit: contain; background: #000; }
+  .upload-preview-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(0,0,0,0.3); font-size: 12px; }
+</style>
+</head>
+<body>
+  <main class="checkout-wrap">
+    <h1 style="color:white;font-size:20px;font-weight:700;">Checkout</h1>
+
+    <div id="loading" class="sst-loading" style="margin-top:24px;">
+      <svg class="sst-loading-figure" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path class="sst-wave sst-wave-1" d="M38 20c2 2.5 2 5.5 0 8" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <path class="sst-wave sst-wave-2" d="M41 17c3.5 4 3.5 9.5 0 14" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <path class="sst-wave sst-wave-3" d="M44 14c5 5.5 5 13 0 19" stroke="#7dd3ff" stroke-width="2" stroke-linecap="round"/>
+        <g class="sst-head">
+          <circle cx="22" cy="16" r="6" fill="#3b6dff"/>
+          <path d="M22 22c-6 0-10 4.5-10 10v6h20v-6c0-5.5-4-10-10-10Z" fill="#3b6dff"/>
+          <rect x="30" y="21" width="3" height="10" rx="1.5" fill="#e8eefc"/>
+          <circle cx="31.5" cy="19" r="3" fill="#e8eefc"/>
+        </g>
+      </svg>
+      <div class="sst-loading-text">Loading ticket…</div>
+    </div>
+    <div id="no-ticket" class="hidden" style="margin-top:24px;text-align:center;">
+      <p class="text-muted">No ticket selected.</p>
+      <a href="/" class="btn btn-primary" style="margin-top:12px;">Back to concert</a>
+    </div>
+
+    <form id="checkout-form" class="glass-raised hidden" style="border-radius:16px;padding:24px;margin-top:24px;">
+      <div id="ticket-summary" class="glass-inset" style="border-radius:12px;padding:16px;margin-bottom:20px;"></div>
+
+      <label class="field">
+        <span class="field-label">Full Name</span>
+        <input required id="fullName" class="glass-input" />
+      </label>
+      <label class="field">
+        <span class="field-label">Email</span>
+        <input required type="email" id="email" class="glass-input" />
+      </label>
+      <label class="field">
+        <span class="field-label">Phone Number</span>
+        <input required id="phone" class="glass-input" />
+      </label>
+
+      <div class="field">
+        <span class="field-label">Delivery Method</span>
+        <div class="delivery-options">
+          <button type="button" class="delivery-btn active" data-method="EMAIL" id="btn-email"></button>
+          <button type="button" class="delivery-btn" data-method="WHATSAPP" id="btn-whatsapp"></button>
+        </div>
+      </div>
+
+      <label class="field hidden" id="whatsapp-field">
+        <span class="field-label">WhatsApp Number</span>
+        <input id="whatsappNumber" class="glass-input" />
+      </label>
+
+      <div class="glass-inset" style="border-radius:12px;padding:16px;margin-bottom:16px;">
+        <div class="summary-row"><span>Subtotal</span><span id="subtotal">₦0</span></div>
+        <div class="summary-total"><span>Total</span><span id="total">₦0</span></div>
+      </div>
+
+      <p id="status-message" class="hidden" style="font-size:13px;color:var(--ice);margin-bottom:8px;"></p>
+      <p id="error-message" class="hidden" style="font-size:13px;color:#f87171;margin-bottom:8px;"></p>
+
+      <button type="submit" id="submit-btn" class="btn btn-primary btn-block">Continue to Payment</button>
+    </form>
+
+    <div id="payment-step" class="glass-raised hidden" style="border-radius:16px;padding:24px;margin-top:24px;">
+      <h2 style="font-size:16px;color:white;margin-bottom:4px;">Make Payment</h2>
+      <p class="text-muted" style="font-size:13px;margin-bottom:16px;">Transfer the exact amount below, then upload your payment receipt.</p>
+
+      <div class="glass-inset" style="border-radius:12px;padding:14px 16px;margin-bottom:20px;">
+        <div class="bank-row">
+          <div><div class="label">Amount</div><div class="value" id="pay-amount"></div></div>
+        </div>
+        <div class="bank-row">
+          <div><div class="label">Bank</div><div class="value" id="pay-bank"></div></div>
+        </div>
+        <div class="bank-row">
+          <div><div class="label">Account Name</div><div class="value" id="pay-account-name"></div></div>
+        </div>
+        <div class="bank-row">
+          <div>
+            <div class="label">Account Number</div>
+            <div class="value" id="pay-account-number"></div>
+          </div>
+          <button type="button" class="copy-btn" id="copy-account-btn"></button>
+        </div>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Upload Payment Receipt</span>
+      </label>
+      <div class="upload-zone" id="upload-zone">
+        <div class="upload-icon" id="upload-icon-holder"></div>
+        <div style="color:white;font-size:14px;font-weight:500;">Tap to upload screenshot</div>
+        <div class="text-muted" style="font-size:12px;margin-top:4px;">PNG, JPG, or WEBP — the full receipt, not cropped</div>
+        <input type="file" id="receipt-input" accept="image/png,image/jpeg,image/webp" class="hidden" />
+      </div>
+      <div class="upload-preview" id="upload-preview">
+        <img id="upload-preview-img" alt="Payment receipt preview" />
+        <div class="upload-preview-bar">
+          <span class="text-muted" id="upload-filename"></span>
+          <button type="button" id="upload-remove-btn" style="background:none;border:none;color:#f87171;font-size:12px;">Remove</button>
+        </div>
+      </div>
+
+      <p id="upload-status" class="hidden" style="font-size:13px;color:var(--ice);margin-top:12px;"></p>
+      <p id="upload-error" class="hidden" style="font-size:13px;color:#f87171;margin-top:12px;"></p>
+
+      <button type="button" id="submit-receipt-btn" class="btn btn-primary btn-block" style="margin-top:16px;" disabled>
+        Submit for Review
+      </button>
+
+      <p style="text-align:center;font-size:12px;color:rgba(232,238,252,0.4);margin-top:12px;">
+        An admin will review your receipt and confirm your order shortly. You'll be able to check the status on the next page.
+      </p>
+    </div>
+  </main>
+
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script>
+  const ticketTypeId = qs("ticketTypeId");
+  const eventId = qs("eventId");
+  const referralCode = qs("ref") || undefined;
+
+  let ticketType = null;
+  let quantity = 1;
+  let deliveryMethod = "EMAIL";
+  let createdOrder = null;
+  let receiptDataUrl = null;
+
+  document.getElementById("btn-email").innerHTML = Icon("mail", { size: 15 }) + " Email";
+  document.getElementById("btn-whatsapp").innerHTML = Icon("whatsapp", { size: 15 }) + " WhatsApp";
+  document.getElementById("copy-account-btn").innerHTML = Icon("copy", { size: 13 }) + " Copy";
+  document.getElementById("upload-icon-holder").innerHTML = Icon("upload", { size: 26 });
+
+  async function init() {
+    if (!ticketTypeId) {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("no-ticket").classList.remove("hidden");
+      return;
+    }
+    try {
+      const data = await api("/api/tickets");
+      ticketType = data.ticketTypes.find((t) => t.id === ticketTypeId);
+      if (!ticketType) throw new Error("Ticket type not found");
+      renderSummary();
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("checkout-form").classList.remove("hidden");
+    } catch (err) {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("no-ticket").classList.remove("hidden");
+    }
+  }
+
+  function renderSummary() {
+    document.getElementById("ticket-summary").innerHTML = `
+      <div class="qty-row">
+        <span style="font-weight:600;color:white;">${escapeHtml(ticketType.name)}</span>
+        <div class="qty-controls">
+          <button type="button" class="qty-btn" id="qty-minus">${Icon("minus", { size: 14 })}</button>
+          <span style="width:24px;text-align:center;color:white;" id="qty-display">${quantity}</span>
+          <button type="button" class="qty-btn" id="qty-plus">${Icon("plus", { size: 14 })}</button>
+        </div>
+      </div>
+      <p class="text-muted" style="font-size:13px;margin-top:8px;">
+        ${formatNaira(ticketType.price)} each · ${ticketType.remaining} left
+      </p>`;
+
+    document.getElementById("qty-minus").onclick = () => {
+      quantity = Math.max(1, quantity - 1);
+      updateQuantityUI();
+    };
+    document.getElementById("qty-plus").onclick = () => {
+      quantity = Math.min(ticketType.remaining, quantity + 1);
+      updateQuantityUI();
+    };
+    updateTotals();
+  }
+
+  function updateQuantityUI() {
+    document.getElementById("qty-display").textContent = quantity;
+    updateTotals();
+  }
+
+  function updateTotals() {
+    const total = ticketType.price * quantity;
+    document.getElementById("subtotal").textContent = formatNaira(total);
+    document.getElementById("total").textContent = formatNaira(total);
+  }
+
+  document.getElementById("btn-email").addEventListener("click", () => setDeliveryMethod("EMAIL"));
+  document.getElementById("btn-whatsapp").addEventListener("click", () => setDeliveryMethod("WHATSAPP"));
+
+  function setDeliveryMethod(method) {
+    deliveryMethod = method;
+    document.getElementById("btn-email").classList.toggle("active", method === "EMAIL");
+    document.getElementById("btn-whatsapp").classList.toggle("active", method === "WHATSAPP");
+    document.getElementById("whatsapp-field").classList.toggle("hidden", method !== "WHATSAPP");
+  }
+
+  document.getElementById("checkout-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("error-message");
+    const statusEl = document.getElementById("status-message");
+    const submitBtn = document.getElementById("submit-btn");
+    errorEl.classList.add("hidden");
+
+    const fullName = document.getElementById("fullName").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const phone = document.getElementById("phone").value.trim();
+    const whatsappNumber = document.getElementById("whatsappNumber").value.trim();
+
+    if (deliveryMethod === "WHATSAPP" && !whatsappNumber) {
+      errorEl.textContent = "Please enter your WhatsApp number.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    statusEl.textContent = "Preparing your order…";
+    statusEl.classList.remove("hidden");
+
+    try {
+      const orderRes = await api("/api/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          eventId,
+          ticketTypeId,
+          quantity,
+          customer: { fullName, email, phone },
+          deliveryMethod,
+          whatsappNumber: deliveryMethod === "WHATSAPP" ? whatsappNumber : undefined,
+          referralCode,
+        }),
+      });
+
+      createdOrder = orderRes.order;
+      await showPaymentStep();
+
+      document.getElementById("checkout-form").classList.add("hidden");
+      document.getElementById("payment-step").classList.remove("hidden");
+    } catch (err) {
+      submitBtn.disabled = false;
+      statusEl.classList.add("hidden");
+      errorEl.textContent = err.message || "Something went wrong.";
+      errorEl.classList.remove("hidden");
+    }
+  });
+
+  async function showPaymentStep() {
+    document.getElementById("pay-amount").textContent = formatNaira(createdOrder.total);
+    try {
+      const info = await api("/api/payment-info");
+      document.getElementById("pay-bank").textContent = info.bankName || "—";
+      document.getElementById("pay-account-name").textContent = info.accountName || "—";
+      document.getElementById("pay-account-number").textContent = info.accountNumber || "—";
+    } catch {
+      document.getElementById("pay-bank").textContent = "Unavailable — please contact support";
+    }
+  }
+
+  document.getElementById("copy-account-btn").addEventListener("click", () => {
+    const number = document.getElementById("pay-account-number").textContent;
+    navigator.clipboard.writeText(number).then(() => {
+      const btn = document.getElementById("copy-account-btn");
+      btn.classList.add("copied");
+      btn.innerHTML = Icon("check-circle", { size: 13 }) + " Copied";
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = Icon("copy", { size: 13 }) + " Copy";
+      }, 1600);
+    });
+  });
+
+  // ---- Receipt upload ----
+  const uploadZone = document.getElementById("upload-zone");
+  const receiptInput = document.getElementById("receipt-input");
+  const uploadPreview = document.getElementById("upload-preview");
+  const uploadPreviewImg = document.getElementById("upload-preview-img");
+  const submitReceiptBtn = document.getElementById("submit-receipt-btn");
+
+  uploadZone.addEventListener("click", () => receiptInput.click());
+  uploadZone.addEventListener("dragover", (e) => { e.preventDefault(); uploadZone.classList.add("drag-over"); });
+  uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("drag-over"));
+  uploadZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove("drag-over");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  receiptInput.addEventListener("change", () => {
+    if (receiptInput.files && receiptInput.files[0]) handleFile(receiptInput.files[0]);
+  });
+
+  function handleFile(file) {
+    const errorEl = document.getElementById("upload-error");
+    errorEl.classList.add("hidden");
+
+    if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+      errorEl.textContent = "Please upload a PNG, JPG, or WEBP image.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    if (file.size > 6 * 1024 * 1024) {
+      errorEl.textContent = "That image is too large. Please upload a screenshot under 6MB.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      receiptDataUrl = reader.result;
+      uploadPreviewImg.src = receiptDataUrl;
+      document.getElementById("upload-filename").textContent = file.name;
+      uploadPreview.classList.add("visible");
+      uploadZone.classList.add("hidden");
+      submitReceiptBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  document.getElementById("upload-remove-btn").addEventListener("click", () => {
+    receiptDataUrl = null;
+    receiptInput.value = "";
+    uploadPreview.classList.remove("visible");
+    uploadZone.classList.remove("hidden");
+    submitReceiptBtn.disabled = true;
+  });
+
+  submitReceiptBtn.addEventListener("click", async () => {
+    const statusEl = document.getElementById("upload-status");
+    const errorEl = document.getElementById("upload-error");
+    errorEl.classList.add("hidden");
+
+    if (!receiptDataUrl) {
+      errorEl.textContent = "Please upload your payment receipt before continuing.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    submitReceiptBtn.disabled = true;
+    statusEl.textContent = "Uploading receipt…";
+    statusEl.classList.remove("hidden");
+
+    try {
+      await api(`/api/orders/${encodeURIComponent(createdOrder.id)}/receipt`, {
+        method: "POST",
+        body: JSON.stringify({ receiptImage: receiptDataUrl }),
+      });
+      window.location.href = `/payment-status?orderId=${encodeURIComponent(createdOrder.id)}`;
+    } catch (err) {
+      submitReceiptBtn.disabled = false;
+      statusEl.classList.add("hidden");
+      errorEl.textContent = err.message || "Could not submit your receipt. Please try again.";
+      errorEl.classList.remove("hidden");
+    }
+  });
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  init();
+</script>
+</body>
+</html>
