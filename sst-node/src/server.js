@@ -1,3 +1,4 @@
+require("dotenv").config();
 const http = require("http");
 const url = require("url");
 const path = require("path");
@@ -143,7 +144,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-seed();
+seed().catch((err) => console.error("Seed failed:", err));
 
 server.listen(PORT, HOST, () => {
   console.log(`Soundstage Tickets running at http://${HOST}:${PORT}`);
