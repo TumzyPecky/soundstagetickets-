@@ -88,14 +88,8 @@
         <span class="field-label">Delivery Method</span>
         <div class="delivery-options">
           <button type="button" class="delivery-btn active" data-method="EMAIL" id="btn-email"></button>
-          <button type="button" class="delivery-btn" data-method="WHATSAPP" id="btn-whatsapp"></button>
         </div>
       </div>
-
-      <label class="field hidden" id="whatsapp-field">
-        <span class="field-label">WhatsApp Number</span>
-        <input id="whatsappNumber" class="glass-input" />
-      </label>
 
       <div class="glass-inset" style="border-radius:12px;padding:16px;margin-bottom:16px;">
         <div class="summary-row"><span>Subtotal</span><span id="subtotal">₦0</span></div>
@@ -175,7 +169,6 @@
   let receiptDataUrl = null;
 
   document.getElementById("btn-email").innerHTML = Icon("mail", { size: 15 }) + " Email";
-  document.getElementById("btn-whatsapp").innerHTML = Icon("whatsapp", { size: 15 }) + " WhatsApp";
   document.getElementById("copy-account-btn").innerHTML = Icon("copy", { size: 13 }) + " Copy";
   document.getElementById("upload-icon-holder").innerHTML = Icon("upload", { size: 26 });
 
@@ -235,13 +228,10 @@
   }
 
   document.getElementById("btn-email").addEventListener("click", () => setDeliveryMethod("EMAIL"));
-  document.getElementById("btn-whatsapp").addEventListener("click", () => setDeliveryMethod("WHATSAPP"));
 
   function setDeliveryMethod(method) {
-    deliveryMethod = method;
-    document.getElementById("btn-email").classList.toggle("active", method === "EMAIL");
-    document.getElementById("btn-whatsapp").classList.toggle("active", method === "WHATSAPP");
-    document.getElementById("whatsapp-field").classList.toggle("hidden", method !== "WHATSAPP");
+    deliveryMethod = "EMAIL";
+    document.getElementById("btn-email").classList.add("active");
   }
 
   document.getElementById("checkout-form").addEventListener("submit", async (e) => {
@@ -254,13 +244,7 @@
     const fullName = document.getElementById("fullName").value.trim();
     const email = document.getElementById("email").value.trim();
     const phone = document.getElementById("phone").value.trim();
-    const whatsappNumber = document.getElementById("whatsappNumber").value.trim();
-
-    if (deliveryMethod === "WHATSAPP" && !whatsappNumber) {
-      errorEl.textContent = "Please enter your WhatsApp number.";
-      errorEl.classList.remove("hidden");
-      return;
-    }
+    const whatsappNumber = "";
 
     submitBtn.disabled = true;
     statusEl.textContent = "Preparing your order…";
@@ -274,8 +258,7 @@
           ticketTypeId,
           quantity,
           customer: { fullName, email, phone },
-          deliveryMethod,
-          whatsappNumber: deliveryMethod === "WHATSAPP" ? whatsappNumber : undefined,
+          deliveryMethod: "EMAIL",
           referralCode,
         }),
       });
