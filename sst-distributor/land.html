@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Sound Stage Tickets</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .land-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .land-card { width: 100%; max-width: 400px; border-radius: 20px; padding: 36px 28px; text-align: center; }
+  .land-card img { width: 64px; height: 64px; border-radius: 14px; object-fit: contain; margin-bottom: 18px; }
+  .land-card h1 { color: white; font-size: 20px; line-height: 1.3; }
+  .land-card p.sub { color: rgba(232,238,252,0.55); font-size: 14px; margin-top: 8px; line-height: 1.5; }
+  .register-btn { width: 100%; margin-top: 26px; font-size: 15px; padding: 14px; }
+  .land-note { font-size: 12px; color: rgba(232,238,252,0.35); margin-top: 18px; }
+  .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; animation: spin 0.7s linear infinite; display: inline-block; vertical-align: -3px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <main class="land-wrap">
+    <div class="glass-raised land-card" id="land-card">
+      <img src="/assets/logo.jpg" alt="Sound Stage Live Concert" />
+      <h1 id="land-title">Soundstage Live Concert</h1>
+      <p class="sub" id="land-sub">One stage. Premium music. Get your ticket.</p>
+      <button type="button" class="btn btn-primary register-btn" id="register-btn">Click here to register</button>
+      <p class="land-note" id="land-note">You'll be taken to the official Sound Stage Tickets site.</p>
+    </div>
+  </main>
+
+<script src="/assets/icons.js"></script>
+<script>
+  (function () {
+    const btn = document.getElementById("register-btn");
+    const note = document.getElementById("land-note");
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const api = params.get("api");
+
+    if (!code || !api) {
+      document.getElementById("land-card").innerHTML = `
+        <h1 style="color:white;font-size:18px;">Link not recognized</h1>
+        <p class="sub">This referral link is missing some information. Please ask for a fresh link.</p>`;
+      return;
+    }
+
+    btn.addEventListener("click", () => {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Redirecting…`;
+      note.textContent = "Taking you to the ticket site…";
+      window.location.href = `${api.replace(/\/+$/, "")}/go/${encodeURIComponent(code)}`;
+    });
+  })();
+</script>
+</body>
+</html>

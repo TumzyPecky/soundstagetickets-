@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Distributor Login | Sound Stage Tickets</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .login-card { width: 100%; max-width: 360px; border-radius: 16px; padding: 32px; }
+  .login-card img { width: 56px; height: 56px; border-radius: 12px; object-fit: contain; margin-bottom: 12px; }
+  .backend-chip { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(232,238,252,0.4); margin-top: 12px; padding: 8px 10px; border-radius: 8px; overflow: hidden; }
+  .backend-chip span.url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .backend-chip a { color: var(--ice); flex-shrink: 0; }
+</style>
+</head>
+<body>
+  <main class="login-wrap">
+    <form id="login-form" class="glass-raised login-card">
+      <img src="/assets/logo.jpg" alt="Sound Stage Live Concert" />
+      <h1 style="color:white;font-size:17px;font-weight:700;">Sound Stage Tickets — Distributors</h1>
+      <p class="text-muted" style="font-size:13px;margin-top:4px;">Sign in to your distributor account.</p>
+
+      <label class="field" style="margin-top:20px;">
+        <span class="field-label">Username</span>
+        <input required id="username" class="glass-input" autocomplete="username" />
+      </label>
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input required type="password" id="password" class="glass-input" autocomplete="current-password" />
+      </label>
+
+      <p id="error-message" class="hidden" style="font-size:13px;color:#f87171;margin-bottom:12px;"></p>
+
+      <button type="submit" id="submit-btn" class="btn btn-primary btn-block">Sign In</button>
+
+      <div class="backend-chip glass-inset">
+        <span id="link-icon"></span>
+        <span class="url" id="backend-url"></span>
+        <a href="/setup.html">Change</a>
+      </div>
+    </form>
+  </main>
+
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script>
+  if (!getApiBase()) {
+    window.location.href = "/setup.html";
+  }
+  document.getElementById("backend-url").textContent = getApiBase();
+  document.getElementById("link-icon").innerHTML = Icon("link", { size: 12 });
+
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("error-message");
+    const submitBtn = document.getElementById("submit-btn");
+    errorEl.classList.add("hidden");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Signing In…";
+
+    try {
+      const data = await api("/api/distributor/login", {
+        method: "POST",
+        body: JSON.stringify({
+          username: document.getElementById("username").value.trim(),
+          password: document.getElementById("password").value,
+        }),
+      });
+      setToken(data.token);
+      window.location.href = "/index.html";
+    } catch (err) {
+      errorEl.textContent = err.message || "Could not sign in.";
+      errorEl.classList.remove("hidden");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Sign In";
+    }
+  });
+</script>
+</body>
+</html>

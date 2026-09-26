@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Dashboard | Sound Stage Tickets Distributor Portal</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .referral-card { border-radius: 16px; padding: 22px; margin-bottom: 20px; }
+  .referral-card .eyebrow-label { font-size: 12px; color: rgba(232,238,252,0.55); margin-bottom: 6px; }
+  .referral-link-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .referral-link-box {
+    flex: 1; min-width: 200px; font-family: monospace; font-size: 13px; color: var(--ice);
+    background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 10px 12px; overflow-x: auto; white-space: nowrap;
+  }
+  .status-banner { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; }
+  .status-banner.pending { background: rgba(212,175,55,0.12); color: #e8cf7a; border: 1px solid rgba(212,175,55,0.25); }
+  .status-banner.suspended { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+</style>
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  (async function () {
+    const distributor = await requireDistributorSession();
+    if (!distributor) return;
+
+    renderDistributorShell("/index.html", `
+      <h1>Welcome, ${distributor.name}</h1>
+      <p class="sub">Share your link and track how many people you've sent to the ticket site.</p>
+      <div id="status-banner"></div>
+
+      <div class="glass-raised referral-card">
+        <div class="eyebrow-label">Your referral link</div>
+        <p class="text-muted" style="font-size:13px;line-height:1.5;">
+          Share this link anywhere. Anyone who opens it and taps "register" counts as one forward for you — even if they don't buy a ticket.
+        </p>
+        <div class="referral-link-row">
+          <div class="referral-link-box" id="referral-link"></div>
+          <button type="button" class="btn btn-primary btn-sm" id="copy-link-btn">${Icon("copy", { size: 14 })} Copy Link</button>
+        </div>
+      </div>
+
+      <div class="stat-grid" id="stat-grid"></div>
+    `);
+
+    if (distributor.status !== "ACTIVE") {
+      const banner = document.getElementById("status-banner");
+      if (distributor.status === "PENDING") {
+        banner.innerHTML = `<div class="status-banner pending">${Icon("clock", { size: 16 })} Your account is pending approval. Your link won't count forwards until an admin activates it.</div>`;
+      } else if (distributor.status === "SUSPENDED") {
+        banner.innerHTML = `<div class="status-banner suspended">${Icon("alert-triangle", { size: 16 })} Your account is suspended. Contact the admin team.</div>`;
+      }
+    }
+
+           const link = `${window.location.origin}/land.html?code=${encodeURIComponent(distributor.referralCode)}&api=${encodeURIComponent(getApiBase())}`;
+    document.getElementById("referral-link").textContent = link;
+    document.getElementById("copy-link-btn").addEventListener("click", async () => {
+      const ok = await copyText(link);
+      const btn = document.getElementById("copy-link-btn");
+      btn.innerHTML = ok
+        ? `${Icon("check-circle", { size: 14 })} Copied`
+        : `${Icon("alert-triangle", { size: 14 })} Copy failed`;
+      setTimeout(() => {
+        btn.innerHTML = `${Icon("copy", { size: 14 })} Copy Link`;
+      }, 1500);
+    });
+
+    try {
+      const data = await api("/api/distributor/stats");
+      const s = data.stats;
+      const stats = [
+        ["Forwards", s.forwards.toLocaleString()],
+        ["Tickets Sold", s.ticketsSold.toLocaleString()],
+        ["Sales Driven", formatNaira(s.revenue)],
+        ["Commission Earned", formatNaira(s.commissionTotal)],
+        ["Commission Pending", formatNaira(s.commissionPending)],
+        ["Commission Paid Out", formatNaira(s.commissionPaid)],
+      ];
+      document.getElementById("stat-grid").innerHTML = stats
+        .map(([label, value]) => `<div class="stat-card glass"><div class="label">${label}</div><div class="value">${value}</div></div>`)
+        .join("");
+    } catch (err) {
+      document.getElementById("admin-content").innerHTML += `<p style="color:#f87171;margin-top:16px;">${err.message}</p>`;
+    }
+  })();
+</script>
+</body>
+</html>

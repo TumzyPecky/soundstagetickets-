@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Settings | Sound Stage Tickets Distributor Portal</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<script src="/assets/icons.js"></script>
+<script src="/assets/api.js"></script>
+<script src="/assets/shell.js"></script>
+<script>
+  (async function () {
+    const distributor = await requireDistributorSession();
+    if (!distributor) return;
+
+    renderDistributorShell("/settings.html", `
+      <h1>Settings</h1>
+      <p class="sub">Manage your distributor portal account.</p>
+
+      <div class="order-section glass" style="max-width:480px;margin-top:24px;border-radius:16px;padding:16px;">
+        <h2 style="font-size:12px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(125,211,255,0.8);">Account</h2>
+        <p style="font-size:14px;color:white;margin-top:8px;">${distributor.name}</p>
+        <p style="font-size:13px;color:rgba(232,238,252,0.5);margin-top:2px;">${distributor.email}</p>
+      </div>
+
+      <div class="order-section glass" style="max-width:480px;margin-top:16px;border-radius:16px;padding:16px;">
+        <h2 style="font-size:12px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(125,211,255,0.8);">Connected Backend</h2>
+        <p style="font-size:14px;color:white;margin-top:8px;word-break:break-all;">${getApiBase()}</p>
+        <button id="change-backend-btn" class="btn btn-secondary btn-sm" style="margin-top:12px;">Connect to a Different Backend</button>
+      </div>
+
+      <div class="order-section glass" style="max-width:480px;margin-top:16px;border-radius:16px;padding:16px;">
+        <h2 style="font-size:12px;text-transform:uppercase;letter-spacing:0.03em;color:rgba(125,211,255,0.8);">Change Password</h2>
+        <form id="password-form" style="margin-top:12px;">
+          <label class="field">
+            <span class="field-label">Current Password</span>
+            <input required type="password" id="current-password" class="glass-input" />
+          </label>
+          <label class="field">
+            <span class="field-label">New Password</span>
+            <input required type="password" id="new-password" class="glass-input" minlength="8" />
+          </label>
+          <p id="pw-error" class="hidden" style="font-size:13px;color:#f87171;margin-bottom:8px;"></p>
+          <p id="pw-success" class="hidden" style="font-size:13px;color:#34d399;margin-bottom:8px;">Password updated.</p>
+          <button type="submit" class="btn btn-primary btn-sm">Update Password</button>
+        </form>
+      </div>
+    `);
+
+    document.getElementById("change-backend-btn").addEventListener("click", () => {
+      if (!confirm("Disconnect from the current backend and connect to a different one? You'll need to sign in again.")) return;
+      clearToken();
+      clearApiBase();
+      window.location.href = "/setup.html";
+    });
+
+    document.getElementById("password-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("pw-error");
+      const successEl = document.getElementById("pw-success");
+      errorEl.classList.add("hidden");
+      successEl.classList.add("hidden");
+
+      try {
+        await api("/api/distributor/change-password", {
+          method: "POST",
+          body: JSON.stringify({
+            currentPassword: document.getElementById("current-password").value,
+            newPassword: document.getElementById("new-password").value,
+          }),
+        });
+        successEl.classList.remove("hidden");
+        document.getElementById("password-form").reset();
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.remove("hidden");
+      }
+    });
+  })();
+</script>
+</body>
+</html>

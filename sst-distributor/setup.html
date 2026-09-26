@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Connect Backend | Sound Stage Tickets Distributor Portal</title>
+<link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .setup-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .setup-card { width: 100%; max-width: 420px; border-radius: 16px; padding: 32px; }
+  .setup-card img { width: 56px; height: 56px; border-radius: 12px; object-fit: contain; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+  <main class="setup-wrap">
+    <form id="setup-form" class="glass-raised setup-card">
+      <img src="/assets/logo.jpg" alt="Sound Stage Live Concert" />
+      <h1 style="color:white;font-size:17px;font-weight:700;">Connect to Your Backend</h1>
+      <p class="text-muted" style="font-size:13px;margin-top:4px;line-height:1.5;">
+        This distributor portal is a separate site from the storefront. Enter
+        the web address of the Sound Stage Tickets backend so this portal can
+        connect to it.
+      </p>
+
+      <label class="field" style="margin-top:20px;">
+        <span class="field-label">Backend API URL</span>
+        <input required id="api-url" class="glass-input" placeholder="https://your-backend.onrender.com" autocomplete="url" />
+      </label>
+
+      <p id="error-message" class="hidden" style="font-size:13px;color:#f87171;margin-bottom:12px;"></p>
+      <p id="checking-message" class="hidden" style="font-size:13px;color:var(--ice);margin-bottom:12px;">Checking connection…</p>
+
+      <button type="submit" id="submit-btn" class="btn btn-primary btn-block">Connect</button>
+
+      <p class="text-faint" style="font-size:11px;margin-top:16px;line-height:1.5;">
+        Ask Sound Stage Tickets for this address if you don't have it.
+      </p>
+    </form>
+  </main>
+
+<script src="/assets/api.js"></script>
+<script>
+  if (getApiBase()) {
+    window.location.href = getToken() ? "/index.html" : "/login.html";
+  }
+
+  document.getElementById("setup-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("error-message");
+    const checkingEl = document.getElementById("checking-message");
+    const submitBtn = document.getElementById("submit-btn");
+    errorEl.classList.add("hidden");
+
+    let url = document.getElementById("api-url").value.trim();
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    url = url.replace(/\/+$/, "");
+
+    submitBtn.disabled = true;
+    checkingEl.classList.remove("hidden");
+
+    try {
+      const res = await fetch(url + "/healthz");
+      if (!res.ok) throw new Error("no-health");
+      const data = await res.json();
+      if (!data || data.status !== "ok") throw new Error("bad-health");
+
+      setApiBase(url);
+      window.location.href = "/login.html";
+    } catch (err) {
+      checkingEl.classList.add("hidden");
+      submitBtn.disabled = false;
+      errorEl.textContent =
+        "Could not reach a Sound Stage Tickets backend at that address. Double-check the URL and make sure the server is running.";
+      errorEl.classList.remove("hidden");
+    }
+  });
+</script>
+</body>
+</html>
