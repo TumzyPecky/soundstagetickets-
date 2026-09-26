@@ -2,212 +2,181 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Distributors | Sound Stage Tickets Admin</title>
 <link rel="stylesheet" href="/assets/styles.css" />
+<style>
+  .dist-search {
+    max-width: 320px;
+    margin-bottom: 16px;
+  }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 20px;
+  }
+  .modal-card {
+    width: 420px;
+    max-width: 100%;
+    border-radius: 16px;
+    padding: 22px;
+  }
+</style>
 </head>
 <body>
 <script src="/assets/icons.js"></script>
 <script src="/assets/api.js"></script>
 <script src="/assets/shell.js"></script>
 <script>
+  let allDistributors = [];
+
+  function renderRows(list) {
+    const body = document.getElementById("dist-body");
+    if (!list.length) {
+      body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:rgba(232,238,252,0.4);padding:24px;">No distributors found.</td></tr>`;
+      return;
+    }
+    body.innerHTML = list
+      .map(
+        (d) => `
+      <tr data-id="${d.id}">
+        <td class="strong">${d.name}</td>
+        <td>${d.referralCode}</td>
+        <td>${statusPill(d.status)}</td>
+        <td class="strong">${d.clicks.toLocaleString()}</td>
+        <td>${d.ticketsSold.toLocaleString()}</td>
+        <td>${formatNaira(d.revenue)}</td>
+        <td>${formatNaira(d.commissionTotal)}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm login-btn">
+            ${d.portalUsername ? "Reset Login" : "Set Portal Login"}
+          </button>
+        </td>
+      </tr>`
+      )
+      .join("");
+
+    list.forEach((d) => {
+      const tr = document.querySelector(`tr[data-id="${d.id}"]`);
+      const btn = tr && tr.querySelector(".login-btn");
+      if (btn) btn.addEventListener("click", () => openLoginModal(d));
+    });
+  }
+
   (async function () {
-    const ok = await requireAdminSession();
-    if (!ok) return;
+    const admin = await requireAdminSession();
+    if (!admin) return;
 
     renderAdminShell("/distributors.html", `
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <h1>Distributors</h1>
-        <button class="btn btn-primary btn-sm" id="new-btn">${Icon("plus", { size: 14 })} New Distributor</button>
+      <h1>Distributors</h1>
+      <p class="sub">Everyone with a referral link, and how many clicks it's driven.</p>
+
+      <div class="search-input-wrap dist-search" style="margin-top:20px;">
+        ${Icon("search", { size: 16 })}
+        <input id="dist-search-input" class="glass-input" placeholder="Search by name or code…" />
       </div>
-      <div id="new-form-wrap" style="margin-top:16px;"></div>
-      <div class="table-wrap glass" style="margin-top:16px;">
+
+      <div class="table-wrap glass">
         <table>
-          <thead><tr><th>Distributor</th><th>Referral Code</th><th>Clicks</th><th>Customers</th><th>Tickets Sold</th><th>Revenue</th><th>Commission</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="dist-body"></tbody>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Referral Code</th>
+              <th>Status</th>
+              <th>Clicks</th>
+              <th>Tickets Sold</th>
+              <th>Revenue</th>
+              <th>Commission</th>
+              <th>Portal Login</th>
+            </tr>
+          </thead>
+          <tbody id="dist-body"><tr><td colspan="8" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">Loading…</td></tr></tbody>
         </table>
       </div>
     `);
 
-    document.getElementById("new-btn").addEventListener("click", showNewForm);
-    await load();
-  })();
-
-  async function load() {
     try {
       const data = await api("/api/admin/distributors");
-      document.getElementById("dist-body").innerHTML = data.distributors.length
-        ? data.distributors.map(rowHtml).join("")
-        : `<tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">No distributors yet.</td></tr>`;
-      data.distributors.forEach(wireRow);
+      allDistributors = data.distributors || [];
+      renderRows(allDistributors);
     } catch (err) {
-      document.getElementById("dist-body").innerHTML = `<tr><td colspan="9" style="color:#f87171;padding:16px;">${err.message}</td></tr>`;
+      document.getElementById("admin-content").innerHTML += `<p style="color:#f87171;margin-top:16px;">${err.message}</p>`;
+      return;
     }
-  }
 
-  function rowHtml(d) {
-    return `
-      <tr data-id="${d.id}">
-        <td><div class="strong" style="color:white;">${d.name}</div><div style="font-size:12px;color:rgba(232,238,252,0.4);">${d.email}</div></td>
-        <td style="font-family:monospace;font-size:12px;">${d.referralCode}</td>
-        <td>${d.clicks}</td>
-        <td>${d.customers}</td>
-        <td>${d.ticketsSold}</td>
-        <td>${formatNaira(d.revenue)}</td>
-        <td>${formatNaira(d.commissionTotal)}</td>
-        <td>${statusPill(d.status)}</td>
-        <td>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            ${d.status !== "ACTIVE" ? `<button class="btn btn-secondary btn-sm approve-btn">Approve</button>` : ""}
-            ${d.status !== "SUSPENDED" ? `<button class="btn btn-secondary btn-sm suspend-btn">Suspend</button>` : ""}
-            ${d.status === "ACTIVE" ? `<button class="btn btn-primary btn-sm issue-btn">Issue Tickets</button>` : ""}
-          </div>
-        </td>
-      </tr>`;
-  }
+    document.getElementById("dist-search-input").addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      if (!q) return renderRows(allDistributors);
+      renderRows(
+        allDistributors.filter(
+          (d) => d.name.toLowerCase().includes(q) || (d.referralCode || "").toLowerCase().includes(q)
+        )
+      );
+    });
+  })();
 
-  function wireRow(d) {
-    const tr = document.querySelector(`tr[data-id="${d.id}"]`);
-    if (!tr) return;
-    const approveBtn = tr.querySelector(".approve-btn");
-    const suspendBtn = tr.querySelector(".suspend-btn");
-    const issueBtn = tr.querySelector(".issue-btn");
-    if (approveBtn) approveBtn.addEventListener("click", () => updateStatus(d.id, "ACTIVE"));
-    if (suspendBtn) suspendBtn.addEventListener("click", () => updateStatus(d.id, "SUSPENDED"));
-    if (issueBtn) issueBtn.addEventListener("click", () => openIssueModal(d));
-  }
-
-  async function updateStatus(id, status) {
-    await api(`/api/admin/distributors/${id}`, { method: "PATCH", body: JSON.stringify({ status }) });
-    load();
-  }
-
-  async function openIssueModal(distributor) {
+  function openLoginModal(distributor) {
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
-    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;";
     overlay.innerHTML = `
-      <div class="glass-raised" style="width:420px;max-width:100%;border-radius:16px;padding:22px;">
-        <h3 style="color:white;font-size:16px;margin-bottom:4px;">Issue Tickets to ${distributor.name}</h3>
-        <p style="color:rgba(232,238,252,0.5);font-size:13px;margin-bottom:16px;">Record a bulk purchase this distributor already paid you for. Tickets are issued immediately — no receipt needed.</p>
-        <form id="issue-form">
+      <div class="modal-card glass-raised">
+        <h3 style="color:white;font-size:16px;margin-bottom:4px;">Portal Login for ${distributor.name}</h3>
+        <p style="color:rgba(232,238,252,0.5);font-size:13px;margin-bottom:16px;">
+          ${distributor.portalUsername
+            ? `Currently: <strong style="color:white;">${distributor.portalUsername}</strong>. Set a new username/password to reset.`
+            : "Set a username and password this distributor will use to sign in to the distributor portal."}
+        </p>
+        <form id="login-form">
           <label style="display:block;margin-bottom:12px;">
-            <span style="display:block;font-size:12px;color:rgba(232,238,252,0.6);margin-bottom:4px;">Ticket Type</span>
-            <select id="issue-ticket-type" class="glass-input" style="width:100%;" required></select>
+            <span style="display:block;font-size:12px;color:rgba(232,238,252,0.6);margin-bottom:4px;">Username</span>
+            <input id="portal-username" class="glass-input" style="width:100%;" minlength="3" required value="${distributor.portalUsername || ""}" />
           </label>
           <label style="display:block;margin-bottom:16px;">
-            <span style="display:block;font-size:12px;color:rgba(232,238,252,0.6);margin-bottom:4px;">Quantity</span>
-            <input type="number" id="issue-quantity" class="glass-input" style="width:100%;" min="1" max="20" value="5" required />
+            <span style="display:block;font-size:12px;color:rgba(232,238,252,0.6);margin-bottom:4px;">Password (min 8 characters)</span>
+            <input type="text" id="portal-password" class="glass-input" style="width:100%;" minlength="8" required />
           </label>
-          <div id="issue-error" style="color:#f87171;font-size:12px;margin-bottom:12px;"></div>
+          <div id="login-error" style="color:#f87171;font-size:12px;margin-bottom:12px;"></div>
           <div style="display:flex;gap:10px;">
-            <button type="button" id="issue-cancel" class="btn btn-secondary btn-sm" style="flex:1;">Cancel</button>
-            <button type="submit" id="issue-submit" class="btn btn-primary btn-sm" style="flex:1;">Issue Tickets</button>
+            <button type="button" id="login-cancel" class="btn btn-secondary btn-sm" style="flex:1;">Cancel</button>
+            <button type="submit" id="login-submit" class="btn btn-primary btn-sm" style="flex:1;">Save Login</button>
           </div>
         </form>
-        <div id="issue-result" class="hidden"></div>
       </div>`;
     document.body.appendChild(overlay);
 
     overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
-    document.getElementById("issue-cancel").addEventListener("click", () => overlay.remove());
+    document.getElementById("login-cancel").addEventListener("click", () => overlay.remove());
 
-    // Load available ticket types into the dropdown
-    const select = document.getElementById("issue-ticket-type");
-    try {
-      const data = await api("/api/tickets");
-      select.innerHTML = data.ticketTypes
-        .map((t) => `<option value="${t.id}" ${t.remaining < 1 ? "disabled" : ""}>${t.name} — ${formatNaira(t.price)} (${t.remaining} left)</option>`)
-        .join("");
-    } catch (err) {
-      select.innerHTML = `<option value="">Could not load ticket types</option>`;
-    }
-
-    document.getElementById("issue-form").addEventListener("submit", async (e) => {
+    document.getElementById("login-form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const errorEl = document.getElementById("issue-error");
+      const errorEl = document.getElementById("login-error");
       errorEl.textContent = "";
-      const ticketTypeId = select.value;
-      const quantity = Number(document.getElementById("issue-quantity").value);
-      const submitBtn = document.getElementById("issue-submit");
+      const submitBtn = document.getElementById("login-submit");
       submitBtn.disabled = true;
-      submitBtn.textContent = "Issuing…";
+      submitBtn.textContent = "Saving…";
 
       try {
-        const result = await api(`/api/admin/distributors/${distributor.id}/bulk-issue`, {
-          method: "POST",
-          body: JSON.stringify({ ticketTypeId, quantity }),
-        });
-        document.getElementById("issue-form").classList.add("hidden");
-        const resultEl = document.getElementById("issue-result");
-        resultEl.classList.remove("hidden");
-        resultEl.innerHTML = `
-          <div style="text-align:center;padding:8px 0 4px;">
-            <div style="font-size:32px;margin-bottom:6px;">✅</div>
-            <p style="color:white;font-size:14px;margin-bottom:4px;">${result.tickets.length} × ${result.ticketType} ticket${result.tickets.length > 1 ? "s" : ""} issued</p>
-            <p style="color:rgba(232,238,252,0.5);font-size:12px;margin-bottom:14px;">Order ${result.order.orderNumber}</p>
-          </div>
-          <div class="glass-inset" style="border-radius:10px;padding:12px 14px;margin-bottom:16px;max-height:200px;overflow-y:auto;">
-            ${result.tickets.map((t) => `<div style="font-family:monospace;font-size:13px;color:#7dd3ff;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.06);">${t}</div>`).join("")}
-          </div>
-          <button type="button" id="issue-copy" class="btn btn-secondary btn-sm" style="width:100%;margin-bottom:8px;">Copy Ticket Numbers</button>
-          <button type="button" id="issue-done" class="btn btn-primary btn-sm" style="width:100%;">Done</button>`;
-
-        document.getElementById("issue-copy").addEventListener("click", () => {
-          navigator.clipboard.writeText(result.tickets.join("\n"));
-          const btn = document.getElementById("issue-copy");
-          btn.textContent = "Copied ✓";
-          setTimeout(() => { btn.textContent = "Copy Ticket Numbers"; }, 1500);
-        });
-        document.getElementById("issue-done").addEventListener("click", () => {
-          overlay.remove();
-          load();
-        });
-      } catch (err) {
-        errorEl.textContent = err.message || "Could not issue tickets.";
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Issue Tickets";
-      }
-    });
-  }
-
-  function showNewForm() {
-    document.getElementById("new-btn").classList.add("hidden");
-    document.getElementById("new-form-wrap").innerHTML = `
-      <form id="new-dist-form" class="inline-form glass">
-        <label><span>Name</span><input required id="d-name" class="glass-input" /></label>
-        <label><span>Email</span><input required type="email" id="d-email" class="glass-input" /></label>
-        <label><span>Phone</span><input required id="d-phone" class="glass-input" /></label>
-        <label><span>Commission %</span><input type="number" min="0" max="100" step="1" id="d-rate" class="glass-input" style="width:80px;" value="10" /></label>
-        <button type="submit" class="btn btn-primary btn-sm">Create</button>
-        <button type="button" id="cancel-new" class="btn btn-secondary btn-sm">Cancel</button>
-        <span id="new-dist-error" style="color:#f87171;font-size:12px;width:100%;"></span>
-      </form>`;
-
-    document.getElementById("cancel-new").addEventListener("click", () => {
-      document.getElementById("new-form-wrap").innerHTML = "";
-      document.getElementById("new-btn").classList.remove("hidden");
-    });
-
-    document.getElementById("new-dist-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const errorEl = document.getElementById("new-dist-error");
-      errorEl.textContent = "";
-      try {
-        await api("/api/admin/distributors", {
+        await api(`/api/admin/distributors/${distributor.id}/set-login`, {
           method: "POST",
           body: JSON.stringify({
-            name: document.getElementById("d-name").value.trim(),
-            email: document.getElementById("d-email").value.trim(),
-            phone: document.getElementById("d-phone").value.trim(),
-            commissionRate: Number(document.getElementById("d-rate").value) / 100,
+            username: document.getElementById("portal-username").value.trim(),
+            password: document.getElementById("portal-password").value,
           }),
         });
-        document.getElementById("new-form-wrap").innerHTML = "";
-        document.getElementById("new-btn").classList.remove("hidden");
-        await load();
+        overlay.remove();
+        // Refresh the table so the button text updates
+        const data = await api("/api/admin/distributors");
+        allDistributors = data.distributors || [];
+        renderRows(allDistributors);
       } catch (err) {
-        errorEl.textContent = err.message;
+        errorEl.textContent = err.message || "Could not save login.";
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Save Login";
       }
     });
   }
