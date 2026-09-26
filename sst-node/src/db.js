@@ -42,6 +42,7 @@ const COLLECTIONS = [
   "commissions",
   "referrals",
   "notifications",
+  "forwards",
 ];
 
 const SEQUENCES_COLLECTION = "_sequences";
@@ -59,6 +60,7 @@ const DEFAULT_DATA = {
   commissions: [],
   referrals: [],
   notifications: [],
+  forwards: [],
   _sequences: {},
 };
 

@@ -15,8 +15,6 @@
     background-color: #0b1530;
     background-image: linear-gradient(120deg, #050a1a 0%, #0b1530 30%, #1a3a8f 60%, #050a1a 100%);
   }
-  /* A single light beam sweeps across the stage once on load, like a
-     spotlight finding its mark - not a looping/decorative animation. */
   .hero::before {
     content: "";
     position: absolute;
@@ -42,6 +40,20 @@
     font-size: 42px; font-weight: 800; letter-spacing: -0.03em; margin: 8px 0; line-height: 1.05;
     animation: hero-rise 0.7s var(--ease-out) 0.08s both;
   }
+  .hero-state-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(59,109,255,0.18);
+    border: 1px solid rgba(125,211,255,0.35);
+    font-size: 13px;
+    color: #7dd3ff;
+    font-weight: 600;
+    animation: hero-rise 0.7s var(--ease-out) 0.12s both;
+  }
   .hero-meta {
     margin-top: 12px; color: var(--ice); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 10px; font-size: 15px;
     animation: hero-rise 0.7s var(--ease-out) 0.16s both;
@@ -64,16 +76,13 @@
   }
 
   .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 20px; }
-  @media (min-width: 640px) { .info-grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (min-width: 640px) { .info-grid { grid-template-columns: repeat(5, 1fr); } }
   .info-block { border-radius: 12px; padding: 12px; }
   .info-block .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(125,211,255,0.8); }
   .info-block .value { margin-top: 4px; font-weight: 500; color: white; }
 
   .ticket-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 20px; }
   @media (min-width: 640px) { .ticket-grid { grid-template-columns: repeat(2, 1fr); } }
-  /* Each ticket sits under its own soft spotlight from above, rather
-     than a uniform card treatment - the VIP tier gets a warmer gold
-     beam instead of just a differently-colored icon. */
   .ticket-card {
     position: relative;
     border-radius: 16px;
@@ -92,9 +101,6 @@
     transform: translateX(-50%);
     pointer-events: none;
   }
-  /* VIP gets a stronger, static "premium" treatment - a warmer gold
-     glow, a soft gold border, and a subtle inner sheen. Nothing here
-     loops or auto-animates; it simply reads as premium at rest. */
   .ticket-card.vip {
     border-color: rgba(212, 175, 55, 0.35);
     box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.09), 0 4px 28px -6px rgba(212, 175, 55, 0.22),
@@ -133,10 +139,6 @@
   .ticket-card.vip .price { color: var(--gold); text-shadow: 0 0 18px rgba(212, 175, 55, 0.35); }
   .ticket-card .remaining { font-size: 12px; color: rgba(232,238,252,0.4); margin-top: 2px; position: relative; }
 
-  /* Scroll-linked "glass mirror" shine: a highlight band on every glass
-     surface whose position is driven directly by scroll position (set
-     via --scroll-shine in JS on each scroll event) - not a timer or
-     looping animation, so it only ever moves because the user scrolls. */
   .glass, .glass-raised {
     background-image: linear-gradient(
       100deg,
@@ -177,6 +179,7 @@
           <img src="/assets/logo.jpg" alt="Soundstage Live Concert" />
         </div>
         <h1 id="event-name"></h1>
+        <div id="event-state-badge" class="hero-state-badge" style="display:none;"></div>
         <div class="hero-meta">
           <span id="event-date-full" style="display:inline-flex;align-items:center;gap:6px;"></span>
           <span class="sep">·</span>
@@ -199,6 +202,7 @@
       <div class="info-grid">
         <div class="info-block glass-inset"><div class="label">Date</div><div class="value" id="info-date"></div></div>
         <div class="info-block glass-inset"><div class="label">Time</div><div class="value" id="info-time"></div></div>
+        <div class="info-block glass-inset"><div class="label">State</div><div class="value" id="info-state"></div></div>
         <div class="info-block glass-inset"><div class="label">Venue</div><div class="value" id="info-venue"></div></div>
         <div class="info-block glass-inset"><div class="label">Location</div><div class="value" id="info-address"></div></div>
       </div>
@@ -239,6 +243,17 @@
     document.getElementById("event-date-full").innerHTML = Icon("calendar", { size: 15 }) + " " + fullDate;
     document.getElementById("event-time").textContent = event.time;
     document.getElementById("event-venue-inline").innerHTML = Icon("map-pin", { size: 15 }) + " " + event.venue;
+
+    // State badge - shows clearly which state's concert this is
+    const stateLabel = [event.city, event.state].filter(Boolean).join(", ");
+    const stateBadge = document.getElementById("event-state-badge");
+    if (stateLabel) {
+      stateBadge.innerHTML = Icon("map-pin", { size: 13 }) + " " + stateLabel + " Concert";
+      stateBadge.style.display = "";
+    } else {
+      stateBadge.style.display = "none";
+    }
+    document.getElementById("info-state").textContent = event.state || "—";
 
     document.getElementById("info-date").textContent = dateObj.toDateString();
     document.getElementById("info-time").textContent = event.time;
@@ -299,7 +314,6 @@
   }
 
   function parseEventDateTime(dateStr, timeStr) {
-    // timeStr like "7:00 PM"
     const d = new Date(dateStr);
     const match = /(\d+):(\d+)\s*(AM|PM)/i.exec(timeStr || "");
     if (match) {

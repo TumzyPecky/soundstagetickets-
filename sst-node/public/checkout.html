@@ -43,6 +43,20 @@
   .upload-preview.visible { display: block; }
   .upload-preview img { width: 100%; display: block; max-height: 360px; object-fit: contain; background: #000; }
   .upload-preview-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(0,0,0,0.3); font-size: 12px; }
+
+  .checkout-state-banner {
+    margin-bottom: 12px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(59,109,255,0.12);
+    border: 1px solid rgba(125,211,255,0.25);
+    font-size: 13px;
+    color: #7dd3ff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.4;
+  }
 </style>
 </head>
 <body>
@@ -69,6 +83,7 @@
     </div>
 
     <form id="checkout-form" class="glass-raised hidden" style="border-radius:16px;padding:24px;margin-top:24px;">
+      <div id="checkout-event-info" class="checkout-state-banner" style="display:none;"></div>
       <div id="ticket-summary" class="glass-inset" style="border-radius:12px;padding:16px;margin-bottom:20px;"></div>
 
       <label class="field">
@@ -182,6 +197,23 @@
       const data = await api("/api/tickets");
       ticketType = data.ticketTypes.find((t) => t.id === ticketTypeId);
       if (!ticketType) throw new Error("Ticket type not found");
+
+      // Show which state this concert is in
+      try {
+        const ev = await api("/api/event");
+        const event = ev.event;
+        const stateLabel = [event.city, event.state].filter(Boolean).join(", ");
+        const banner = document.getElementById("checkout-event-info");
+        if (stateLabel) {
+          banner.innerHTML = Icon("map-pin", { size: 14 }) + ` You're buying a ticket for the <strong style="color:white;">${stateLabel}</strong> concert`;
+          banner.style.display = "";
+        } else {
+          banner.style.display = "none";
+        }
+      } catch {
+        document.getElementById("checkout-event-info").style.display = "none";
+      }
+
       renderSummary();
       document.getElementById("loading").classList.add("hidden");
       document.getElementById("checkout-form").classList.remove("hidden");
@@ -244,7 +276,6 @@
     const fullName = document.getElementById("fullName").value.trim();
     const email = document.getElementById("email").value.trim();
     const phone = document.getElementById("phone").value.trim();
-    const whatsappNumber = "";
 
     submitBtn.disabled = true;
     statusEl.textContent = "Preparing your order…";
@@ -301,7 +332,6 @@
     });
   });
 
-  // ---- Receipt upload ----
   const uploadZone = document.getElementById("upload-zone");
   const receiptInput = document.getElementById("receipt-input");
   const uploadPreview = document.getElementById("upload-preview");

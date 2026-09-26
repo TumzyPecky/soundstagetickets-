@@ -3,8 +3,6 @@ const { hashPassword } = require("./auth");
 const { nairaToKobo } = require("./money");
 
 async function seed() {
-  // Wait until the Mongo connection is fully hydrated before deciding
-  // whether anything needs seeding.
   while (!db.isReady()) {
     await new Promise((r) => setTimeout(r, 100));
   }
@@ -18,6 +16,8 @@ async function seed() {
       time: "7:00 PM Prompt",
       venue: "Hybrid Heights",
       address: "Opposite UI International Conference Centre, UI Road, Ibadan",
+      city: "Ibadan",
+      state: "Oyo State",
       bannerUrl: "/assets/logo.jpg",
       status: "PUBLISHED",
     });
@@ -63,7 +63,6 @@ async function seed() {
     }
   }
 
-  // Wait for all in-flight writes to Mongo to complete before returning.
   await db.flushSync();
 }
 

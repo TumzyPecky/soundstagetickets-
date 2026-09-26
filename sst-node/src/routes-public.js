@@ -2,6 +2,9 @@ const db = require("./db");
 const services = require("./services");
 const { sendJson, readJsonBody } = require("./http-utils");
 const { koboToNaira } = require("./money");
+const { createDistributorSession, getSession, destroySession } = require("./sessions");
+const distributorService = require("./distributor-service");
+const { verifyPassword, hashPassword } = require("./auth");
 
 function serializeTicketType(tt) {
   return {
@@ -12,6 +15,23 @@ function serializeTicketType(tt) {
     remaining: Math.max(tt.quantity - tt.soldQuantity, 0),
     status: tt.status,
   };
+}
+
+function getBearerToken(req) {
+  const header = req.headers.authorization || "";
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  return match ? match[1] : null;
+}
+
+function requireDistributor(req) {
+  const token = getBearerToken(req);
+  const session = getSession(token);
+  if (!session || !session.distributorId) {
+    throw distributorService.httpError(401, "Not authenticated");
+  }
+  const distributor = db.getById("distributors", session.distributorId);
+  if (!distributor) throw distributorService.httpError(401, "Not authenticated");
+  return distributor;
 }
 
 async function handlePublicApi(req, url, res) {
@@ -57,13 +77,9 @@ async function handlePublicApi(req, url, res) {
   }
 
   // POST /api/orders/:id/receipt - upload a payment receipt screenshot
-  // for a pending order. Moves the order into the admin's review queue.
   const receiptMatch = pathname.match(/^\/api\/orders\/([^/]+)\/receipt$/);
   if (receiptMatch && req.method === "POST") {
     try {
-      // 9MB cap here (vs the 1MB default) to fit a base64-encoded photo;
-      // services.submitReceipt applies its own tighter effective limit
-      // and validates it's actually an image before accepting it.
       const body = await readJsonBody(req, { maxSize: 9 * 1024 * 1024 });
       const order = services.submitReceipt(receiptMatch[1], body.receiptImage);
       return sendJson(res, 200, { order: { id: order.id, orderNumber: order.orderNumber, status: order.status } });
@@ -72,8 +88,7 @@ async function handlePublicApi(req, url, res) {
     }
   }
 
-  // GET /api/orders/:id/status - poll an order's review status (used by
-  // the "awaiting review" page after a receipt is uploaded)
+  // GET /api/orders/:id/status
   const orderStatusMatch = pathname.match(/^\/api\/orders\/([^/]+)\/status$/);
   if (orderStatusMatch && req.method === "GET") {
     try {
@@ -85,7 +100,7 @@ async function handlePublicApi(req, url, res) {
     }
   }
 
-  // GET /api/ticket/:ticketNumber - ticket detail for the ticket display page
+  // GET /api/ticket/:ticketNumber
   const ticketMatch = pathname.match(/^\/api\/ticket\/([^/]+)$/);
   if (ticketMatch && req.method === "GET") {
     const result = services.getTicketByNumber(decodeURIComponent(ticketMatch[1]));
@@ -108,6 +123,82 @@ async function handlePublicApi(req, url, res) {
       },
       priceLabel: `${koboToNaira(ticketType.price).toLocaleString("en-NG")}`,
     });
+  }
+
+  // ---------- Distributor portal API ----------
+
+  // POST /api/distributor/login
+  if (pathname === "/api/distributor/login" && req.method === "POST") {
+    const body = await readJsonBody(req);
+    const distributor = distributorService.verifyDistributorLogin(body.username, body.password);
+    if (!distributor) {
+      return sendJson(res, 401, { error: "Invalid username or password" });
+    }
+    const token = createDistributorSession(distributor.id);
+    return sendJson(res, 200, {
+      token,
+      distributor: {
+        id: distributor.id,
+        name: distributor.name,
+        username: distributor.portalUsername,
+        status: distributor.status,
+      },
+    });
+  }
+
+  // POST /api/distributor/logout
+  if (pathname === "/api/distributor/logout" && req.method === "POST") {
+    const token = getBearerToken(req);
+    destroySession(token);
+    return sendJson(res, 200, { ok: true });
+  }
+
+  // GET /api/distributor/me
+  if (pathname === "/api/distributor/me" && req.method === "GET") {
+    try {
+      const d = requireDistributor(req);
+      return sendJson(res, 200, {
+        distributor: {
+          id: d.id,
+          name: d.name,
+          email: d.email,
+          referralCode: d.referralCode,
+          status: d.status,
+          commissionRate: d.commissionRate,
+        },
+      });
+    } catch (err) {
+      return sendJson(res, err.status || 401, { error: err.message });
+    }
+  }
+
+  // GET /api/distributor/stats
+  if (pathname === "/api/distributor/stats" && req.method === "GET") {
+    try {
+      const d = requireDistributor(req);
+      const stats = distributorService.getDistributorStats(d.id);
+      return sendJson(res, 200, { stats });
+    } catch (err) {
+      return sendJson(res, err.status || 500, { error: err.message });
+    }
+  }
+
+  // POST /api/distributor/change-password
+  if (pathname === "/api/distributor/change-password" && req.method === "POST") {
+    try {
+      const d = requireDistributor(req);
+      const body = await readJsonBody(req);
+      if (!verifyPassword(body.currentPassword || "", d.passwordHash)) {
+        return sendJson(res, 401, { error: "Current password is incorrect" });
+      }
+      if (!body.newPassword || body.newPassword.length < 8) {
+        return sendJson(res, 400, { error: "New password must be at least 8 characters" });
+      }
+      db.update("distributors", d.id, { passwordHash: hashPassword(body.newPassword) });
+      return sendJson(res, 200, { ok: true });
+    } catch (err) {
+      return sendJson(res, err.status || 500, { error: err.message });
+    }
   }
 
   return null; // not a public API route

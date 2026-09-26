@@ -125,6 +125,27 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, { status: "ok" });
     }
 
+        // GET /go/:code - a distributor's referral landing page button hits
+    // this route. Records a click (deduped by IP), then redirects to
+    // the real ticket site. Set REAL_SITE_URL in the environment.
+    const goMatch = parsed.pathname.match(/^\/go\/([^/]+)$/);
+    if (goMatch && req.method === "GET") {
+      const code = decodeURIComponent(goMatch[1]);
+      const ip =
+        (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+        req.socket.remoteAddress ||
+        "unknown";
+      try {
+        const distributorService = require("./distributor-service");
+        distributorService.recordForward(code, ip);
+      } catch (err) {
+        console.error("[go] recordForward failed:", err.message);
+      }
+      const target = process.env.REAL_SITE_URL || "https://soundstagetickets.com.ng";
+      res.writeHead(302, { Location: `${target}/?ref=${encodeURIComponent(code)}` });
+      return res.end();
+    }
+
     if (parsed.pathname.startsWith("/api/admin/")) {
       const handled = await handleAdminApi(req, parsed, res);
       if (handled !== null) return;

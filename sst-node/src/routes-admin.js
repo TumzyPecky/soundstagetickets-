@@ -355,6 +355,52 @@ async function handleAdminApi(req, url, res) {
     return sendJson(res, 200, { ok: true });
   }
 
+    // ---------- Distributor portal logins ----------
+  // POST /api/admin/distributors/:id/set-login - create or reset a
+  // distributor's login credentials for the distributor portal.
+  const setLoginMatch = pathname.match(/^\/api\/admin\/distributors\/([^/]+)\/set-login$/);
+  if (setLoginMatch && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const distributorService = require("./distributor-service");
+      const updated = distributorService.setDistributorLogin(
+        setLoginMatch[1],
+        body.username,
+        body.password
+      );
+      return sendJson(res, 200, {
+        distributor: {
+          id: updated.id,
+          name: updated.name,
+          portalUsername: updated.portalUsername,
+        },
+      });
+    } catch (err) {
+      return sendJson(res, err.status || 500, { error: err.message });
+    }
+  }
+
+  // ---------- Notifications feed (for the admin bell) ----------
+  // GET /api/admin/notifications - recent forward events, newest first.
+  if (pathname === "/api/admin/notifications" && req.method === "GET") {
+    const forwards = db
+      .all("forwards")
+      .slice()
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 50)
+      .map((f) => {
+        const distributor = db.getById("distributors", f.distributorId);
+        return {
+          id: f.id,
+          type: "FORWARD",
+          distributorName: distributor ? distributor.name : "Unknown",
+          referralCode: f.referralCode,
+          at: f.createdAt,
+        };
+      });
+    return sendJson(res, 200, { notifications: forwards });
+  }
+
   return null; // not an admin API route
 }
 
