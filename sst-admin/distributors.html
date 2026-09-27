@@ -26,6 +26,11 @@
     border-radius: 16px;
     padding: 22px;
   }
+  .row-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
 </style>
 </head>
 <body>
@@ -38,7 +43,7 @@
   function renderRows(list) {
     const body = document.getElementById("dist-body");
     if (!list.length) {
-      body.innerHTML = `<tr><td colspan="8" style="text-align:center;color:rgba(232,238,252,0.4);padding:24px;">No distributors found.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="9" style="text-align:center;color:rgba(232,238,252,0.4);padding:24px;">No distributors found.</td></tr>`;
       return;
     }
     body.innerHTML = list
@@ -57,15 +62,46 @@
             ${d.portalUsername ? "Reset Login" : "Set Portal Login"}
           </button>
         </td>
+        <td>
+          <div class="row-actions">
+            ${d.status !== "ACTIVE" ? `<button class="btn btn-primary btn-sm approve-btn">Approve</button>` : ""}
+            ${d.status !== "SUSPENDED" ? `<button class="btn btn-secondary btn-sm suspend-btn">Suspend</button>` : ""}
+          </div>
+        </td>
       </tr>`
       )
       .join("");
 
     list.forEach((d) => {
       const tr = document.querySelector(`tr[data-id="${d.id}"]`);
-      const btn = tr && tr.querySelector(".login-btn");
-      if (btn) btn.addEventListener("click", () => openLoginModal(d));
+      if (!tr) return;
+      const loginBtn = tr.querySelector(".login-btn");
+      const approveBtn = tr.querySelector(".approve-btn");
+      const suspendBtn = tr.querySelector(".suspend-btn");
+      if (loginBtn) loginBtn.addEventListener("click", () => openLoginModal(d));
+      if (approveBtn) approveBtn.addEventListener("click", () => updateStatus(d, "ACTIVE"));
+      if (suspendBtn) suspendBtn.addEventListener("click", () => updateStatus(d, "SUSPENDED"));
     });
+  }
+
+  async function reloadList() {
+    const data = await api("/api/admin/distributors");
+    allDistributors = data.distributors || [];
+    renderRows(allDistributors);
+  }
+
+  async function updateStatus(distributor, status) {
+    const verb = status === "ACTIVE" ? "approve" : "suspend";
+    if (!confirm(`Are you sure you want to ${verb} ${distributor.name}?`)) return;
+    try {
+      await api(`/api/admin/distributors/${distributor.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      });
+      await reloadList();
+    } catch (err) {
+      alert("Could not update status: " + err.message);
+    }
   }
 
   (async function () {
@@ -100,9 +136,10 @@
               <th>Revenue</th>
               <th>Commission</th>
               <th>Portal Login</th>
+              <th>Actions</th>
             </tr>
           </thead>
-          <tbody id="dist-body"><tr><td colspan="8" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">Loading…</td></tr></tbody>
+          <tbody id="dist-body"><tr><td colspan="9" style="text-align:center;padding:24px;color:rgba(232,238,252,0.4);">Loading…</td></tr></tbody>
         </table>
       </div>
     `);
@@ -110,9 +147,7 @@
     document.getElementById("new-dist-btn").addEventListener("click", showNewForm);
 
     try {
-      const data = await api("/api/admin/distributors");
-      allDistributors = data.distributors || [];
-      renderRows(allDistributors);
+      await reloadList();
     } catch (err) {
       document.getElementById("admin-content").innerHTML += `<p style="color:#f87171;margin-top:16px;">${err.message}</p>`;
       return;
@@ -175,10 +210,7 @@
         });
         document.getElementById("new-form-wrap").innerHTML = "";
         document.getElementById("new-dist-btn").classList.remove("hidden");
-        // Reload the table
-        const data = await api("/api/admin/distributors");
-        allDistributors = data.distributors || [];
-        renderRows(allDistributors);
+        await reloadList();
       } catch (err) {
         errorEl.textContent = err.message;
       }
@@ -234,9 +266,7 @@
           }),
         });
         overlay.remove();
-        const data = await api("/api/admin/distributors");
-        allDistributors = data.distributors || [];
-        renderRows(allDistributors);
+        await reloadList();
       } catch (err) {
         errorEl.textContent = err.message || "Could not save login.";
         submitBtn.disabled = false;
