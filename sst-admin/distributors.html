@@ -73,8 +73,15 @@
     if (!admin) return;
 
     renderAdminShell("/distributors.html", `
-      <h1>Distributors</h1>
-      <p class="sub">Everyone with a referral link, and how many clicks it's driven.</p>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+          <h1 style="margin:0;">Distributors</h1>
+          <p class="sub" style="margin:4px 0 0;">Everyone with a referral link, and how many clicks it's driven.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" id="new-dist-btn">${Icon("plus", { size: 14 })} New Distributor</button>
+      </div>
+
+      <div id="new-form-wrap" style="margin-top:16px;"></div>
 
       <div class="search-input-wrap dist-search" style="margin-top:20px;">
         ${Icon("search", { size: 16 })}
@@ -100,6 +107,8 @@
       </div>
     `);
 
+    document.getElementById("new-dist-btn").addEventListener("click", showNewForm);
+
     try {
       const data = await api("/api/admin/distributors");
       allDistributors = data.distributors || [];
@@ -119,6 +128,62 @@
       );
     });
   })();
+
+  function showNewForm() {
+    document.getElementById("new-dist-btn").classList.add("hidden");
+    document.getElementById("new-form-wrap").innerHTML = `
+      <form id="new-dist-form" class="inline-form glass" style="padding:16px;border-radius:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+        <label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px;">
+          <span style="font-size:12px;color:rgba(232,238,252,0.6);">Name</span>
+          <input required id="d-name" class="glass-input" />
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:140px;">
+          <span style="font-size:12px;color:rgba(232,238,252,0.6);">Email</span>
+          <input required type="email" id="d-email" class="glass-input" />
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;">
+          <span style="font-size:12px;color:rgba(232,238,252,0.6);">Phone</span>
+          <input required id="d-phone" class="glass-input" />
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;width:100px;">
+          <span style="font-size:12px;color:rgba(232,238,252,0.6);">Commission %</span>
+          <input type="number" min="0" max="100" step="1" id="d-rate" class="glass-input" value="10" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-sm">Create</button>
+        <button type="button" id="cancel-new" class="btn btn-secondary btn-sm">Cancel</button>
+        <span id="new-dist-error" style="color:#f87171;font-size:12px;width:100%;"></span>
+      </form>`;
+
+    document.getElementById("cancel-new").addEventListener("click", () => {
+      document.getElementById("new-form-wrap").innerHTML = "";
+      document.getElementById("new-dist-btn").classList.remove("hidden");
+    });
+
+    document.getElementById("new-dist-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById("new-dist-error");
+      errorEl.textContent = "";
+      try {
+        await api("/api/admin/distributors", {
+          method: "POST",
+          body: JSON.stringify({
+            name: document.getElementById("d-name").value.trim(),
+            email: document.getElementById("d-email").value.trim(),
+            phone: document.getElementById("d-phone").value.trim(),
+            commissionRate: Number(document.getElementById("d-rate").value) / 100,
+          }),
+        });
+        document.getElementById("new-form-wrap").innerHTML = "";
+        document.getElementById("new-dist-btn").classList.remove("hidden");
+        // Reload the table
+        const data = await api("/api/admin/distributors");
+        allDistributors = data.distributors || [];
+        renderRows(allDistributors);
+      } catch (err) {
+        errorEl.textContent = err.message;
+      }
+    });
+  }
 
   function openLoginModal(distributor) {
     const overlay = document.createElement("div");
@@ -169,7 +234,6 @@
           }),
         });
         overlay.remove();
-        // Refresh the table so the button text updates
         const data = await api("/api/admin/distributors");
         allDistributors = data.distributors || [];
         renderRows(allDistributors);
